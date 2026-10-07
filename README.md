@@ -2,6 +2,10 @@
 
 An educational Search & Path Planning project built in Python and Streamlit. It demonstrates how A*, BFS, DFS, Uniform-Cost Search, and Greedy Best-First Search explore the same four-directional grid maze, then compares their measured behavior with a human attempt.
 
+## Live web app
+
+Open the project in your browser: **[CSBP301 AI Maze Solver](https://csbp301-ai-maze-solver.streamlit.app/)**
+
 ## 1. Project objective
 
 The objective is to make classical artificial-intelligence search visible and measurable. A user builds or generates a maze, selects a search strategy, watches its explored nodes and final path, and compares the result with other algorithms or a manual attempt.
