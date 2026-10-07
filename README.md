@@ -73,6 +73,8 @@ streamlit run app.py
 
 The sidebar selects Start and Goal, loads either predefined example, creates a random maze, clears walls, selects an algorithm, adjusts animation speed, and optionally displays A* scores. In the wall editor, tick a cell to make it a wall. Start defaults to the upper-left cell and Goal defaults to the lower-right cell.
 
+The maze is deliberately rendered at a compact fixed size so the controls, results, and comparison table remain visible on ordinary laptop screens.
+
 ## 12. Testing
 
 The tests use the Python standard-library `unittest` runner:

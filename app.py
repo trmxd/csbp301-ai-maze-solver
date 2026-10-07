@@ -67,6 +67,13 @@ def show_legend() -> None:
     st.markdown(items, unsafe_allow_html=True)
 
 
+def show_maze(fig) -> None:
+    """Render a compact maze without stretching it to the page width."""
+
+    st.pyplot(fig, width="content")
+    plt.close(fig)
+
+
 def edit_maze(maze: Maze, key: str) -> None:
     st.caption("Tick cells to make walls. Start and Goal are always kept open.")
     wall_data = [
@@ -109,7 +116,7 @@ def animate_result(maze: Maze, result, speed: float, show_scores: bool, title: s
         explored.append(cell)
         label.caption(f"{title}{result.algorithm}: expanding {cell} ({index}/{len(result.explored_order)})")
         fig = maze_figure(maze, explored=explored, scores=result.scores, show_scores=show_scores)
-        canvas.pyplot(fig, clear_figure=True)
+        canvas.pyplot(fig, clear_figure=True, width="content")
         plt.close(fig)
         time.sleep(delay)
     shown_path: list[tuple[int, int]] = []
@@ -117,7 +124,7 @@ def animate_result(maze: Maze, result, speed: float, show_scores: bool, title: s
         shown_path.append(cell)
         label.caption(f"{title}{result.algorithm}: drawing final path")
         fig = maze_figure(maze, explored=explored, path=shown_path, scores=result.scores, show_scores=show_scores)
-        canvas.pyplot(fig, clear_figure=True)
+        canvas.pyplot(fig, clear_figure=True, width="content")
         plt.close(fig)
         time.sleep(delay)
     label.caption(f"{title}{result.algorithm}: animation complete")
@@ -132,8 +139,7 @@ def solver_tab(maze: Maze, algorithm: str, speed: float, show_scores: bool) -> N
     edit_maze(maze, f"solver_editor_{st.session_state.editor_version}")
     show_legend()
     fig = maze_figure(maze)
-    st.pyplot(fig)
-    plt.close(fig)
+    show_maze(fig)
 
     left, middle, right = st.columns(3)
     solve = left.button("▶ Solve Maze", type="primary", use_container_width=True)
@@ -157,8 +163,7 @@ def solver_tab(maze: Maze, algorithm: str, speed: float, show_scores: bool) -> N
             scores=result.scores,
             show_scores=show_scores and result.algorithm == "A*",
         )
-        st.pyplot(fig)
-        plt.close(fig)
+        show_maze(fig)
 
     st.info(ALGORITHM_EXPLANATIONS[algorithm], icon="🧠")
     if st.button("Compare all algorithms on this maze"):
@@ -209,8 +214,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
     human_path = st.session_state.human_path
     current = human_path[-1] if human_path else active_maze.start
     fig = maze_figure(active_maze, human_path=human_path, current=current)
-    st.pyplot(fig)
-    plt.close(fig)
+    show_maze(fig)
     show_legend()
 
     if st.session_state.human_active:

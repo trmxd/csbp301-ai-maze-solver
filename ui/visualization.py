@@ -44,7 +44,8 @@ def maze_figure(
     if current is not None and current not in (maze.start, maze.goal):
         grid[current] = 7
 
-    size = max(4.5, min(8.0, max(maze.rows, maze.cols) * 0.48))
+    # Keep the maze presentation-friendly instead of filling the page width.
+    size = max(3.6, min(5.0, max(maze.rows, maze.cols) * 0.34))
     fig, ax = plt.subplots(figsize=(size, size))
     ax.imshow(grid, cmap=ListedColormap(COLORS), vmin=0, vmax=len(COLORS) - 1)
     ax.set_xticks(np.arange(-0.5, maze.cols, 1), minor=True)
@@ -59,4 +60,3 @@ def maze_figure(
 
     fig.tight_layout(pad=0.1)
     return fig
-
