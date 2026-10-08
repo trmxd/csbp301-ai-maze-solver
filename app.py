@@ -110,9 +110,17 @@ def display_result(result) -> None:
         st.error("No path found.")
 
 
-def animate_result(maze: Maze, result, speed: float, show_scores: bool, title: str = "") -> None:
-    label = st.empty()
-    canvas = st.empty()
+def animate_result(
+    maze: Maze,
+    result,
+    speed: float,
+    show_scores: bool,
+    title: str = "",
+    label=None,
+    canvas=None,
+) -> None:
+    label = label if label is not None else st.empty()
+    canvas = canvas if canvas is not None else st.empty()
     delay = max(0.0, speed)
     explored: list[tuple[int, int]] = []
     for index, cell in enumerate(result.explored_order, start=1):
@@ -215,48 +223,79 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
     st.subheader("Human vs AI Simulation")
     st.write("Start an attempt to freeze a copy of the current maze. Every AI algorithm then receives that exact same copy.")
 
-    if st.button("Start Human Attempt", type="primary"):
-        st.session_state.sim_maze = maze.copy()
-        st.session_state.human_path = [maze.start]
-        st.session_state.human_started = time.perf_counter()
-        st.session_state.human_active = maze.start != maze.goal
-        st.session_state.human_result = None if maze.start != maze.goal else {
-            "Method": "Human", "Solved?": "Yes", "Path Length": 0,
-            "Path Cost": 0, "Expanded Nodes": "—", "Visited Nodes": 1,
-            "Time (ms)": 0.0,
-        }
-        st.session_state.sim_results = None
-        st.session_state.last_keyboard_event = None
+    ai_col, human_col = st.columns(2, gap="large")
 
-    handle_keyboard_event(keyboard_event(active=st.session_state.human_active))
+    with human_col:
+        st.markdown("#### Human Attempt")
+        if st.button("Start Human Attempt", type="primary"):
+            st.session_state.sim_maze = maze.copy()
+            st.session_state.human_path = [maze.start]
+            st.session_state.human_started = time.perf_counter()
+            st.session_state.human_active = maze.start != maze.goal
+            st.session_state.human_result = None if maze.start != maze.goal else {
+                "Method": "Human", "Solved?": "Yes", "Path Length": 0,
+                "Path Cost": 0, "Expanded Nodes": "—", "Visited Nodes": 1,
+                "Time (ms)": 0.0,
+            }
+            st.session_state.sim_results = None
+            st.session_state.last_keyboard_event = None
 
-    active_maze = st.session_state.sim_maze or maze
-    human_path = st.session_state.human_path
-    current = human_path[-1] if human_path else active_maze.start
-    fig = maze_figure(active_maze, human_path=human_path, current=current)
-    show_maze(fig)
-    show_legend()
+        handle_keyboard_event(keyboard_event(active=st.session_state.human_active))
 
-    if st.session_state.human_active:
-        elapsed = time.perf_counter() - st.session_state.human_started
-        st.write(f"Current position: **{current}** · Moves: **{len(human_path) - 1}** · Time: **{elapsed:.2f} s**")
-        st.caption(f"Current path: {human_path}")
-        st.caption("Keyboard: Arrow Keys or WASD")
-        _, up, _ = st.columns(3)
-        up.button("↑ Up", on_click=move_human, args=((-1, 0),), use_container_width=True)
-        left, down, right = st.columns(3)
-        left.button("← Left", on_click=move_human, args=((0, -1),), use_container_width=True)
-        down.button("↓ Down", on_click=move_human, args=((1, 0),), use_container_width=True)
-        right.button("Right →", on_click=move_human, args=((0, 1),), use_container_width=True)
-    elif st.session_state.human_result:
-        st.success(f"Goal reached in {st.session_state.human_result['Path Length']} moves.")
-    else:
-        st.caption("Click Start Human Attempt to enable the movement controls.")
+        active_maze = st.session_state.sim_maze or maze
+        human_path = st.session_state.human_path
+        current = human_path[-1] if human_path else active_maze.start
+        fig = maze_figure(active_maze, human_path=human_path, current=current)
+        show_maze(fig)
+        show_legend()
 
-    if st.button("Run AI Simulation", disabled=st.session_state.sim_maze is None):
-        st.session_state.sim_results = run_all(active_maze)
-        for result in st.session_state.sim_results:
-            animate_result(active_maze, result, speed, show_scores and result.algorithm == "A*", title="AI simulation · ")
+        if st.session_state.human_active:
+            elapsed = time.perf_counter() - st.session_state.human_started
+            st.write(f"Current position: **{current}** · Moves: **{len(human_path) - 1}** · Time: **{elapsed:.2f} s**")
+            st.caption(f"Current path: {human_path}")
+            st.caption("Keyboard: Arrow Keys or WASD")
+            _, up, _ = st.columns(3)
+            up.button("↑ Up", on_click=move_human, args=((-1, 0),), use_container_width=True)
+            left, down, right = st.columns(3)
+            left.button("← Left", on_click=move_human, args=((0, -1),), use_container_width=True)
+            down.button("↓ Down", on_click=move_human, args=((1, 0),), use_container_width=True)
+            right.button("Right →", on_click=move_human, args=((0, 1),), use_container_width=True)
+        elif st.session_state.human_result:
+            st.success(f"Goal reached in {st.session_state.human_result['Path Length']} moves.")
+        else:
+            st.caption("Click Start Human Attempt to enable the movement controls.")
+
+    with ai_col:
+        st.markdown("#### AI Simulation")
+        run_ai = st.button("Run AI Simulation", disabled=st.session_state.sim_maze is None)
+        if run_ai:
+            st.session_state.sim_results = run_all(active_maze)
+            ai_label = st.empty()
+            ai_canvas = st.empty()
+            for result in st.session_state.sim_results:
+                animate_result(
+                    active_maze,
+                    result,
+                    speed,
+                    show_scores and result.algorithm == "A*",
+                    title="AI simulation · ",
+                    label=ai_label,
+                    canvas=ai_canvas,
+                )
+        elif st.session_state.sim_results:
+            result = st.session_state.sim_results[-1]
+            st.caption(f"Latest AI view: {result.algorithm}")
+            fig = maze_figure(
+                active_maze,
+                explored=result.explored_order,
+                path=result.path,
+                scores=result.scores,
+                show_scores=show_scores and result.algorithm == "A*",
+            )
+            show_maze(fig)
+        else:
+            fig = maze_figure(active_maze)
+            show_maze(fig)
 
     if st.session_state.sim_results:
         rows = []

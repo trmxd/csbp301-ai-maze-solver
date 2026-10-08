@@ -50,19 +50,24 @@
         }
       });
 
-      try {
-        const parentWindow = window.parent;
-        const parentDocument = parentWindow.document;
-        if (parentWindow.__mazeKeyboardHandler) {
-          parentDocument.removeEventListener(
-            "keydown", parentWindow.__mazeKeyboardHandler, true
-          );
+      function installSingleListener(targetWindow) {
+        try {
+          const targetDocument = targetWindow.document;
+          if (targetWindow.__mazeKeyboardHandler) {
+            targetDocument.removeEventListener(
+              "keydown", targetWindow.__mazeKeyboardHandler, true
+            );
+          }
+          targetWindow.__mazeKeyboardHandler = onKeyDown;
+          targetDocument.addEventListener("keydown", onKeyDown, true);
+        } catch (_) {
+          // Cross-origin parents are skipped; the component document is the fallback.
         }
-        parentWindow.__mazeKeyboardHandler = onKeyDown;
-        parentDocument.addEventListener("keydown", onKeyDown, true);
-      } catch (_) {
-        document.addEventListener("keydown", onKeyDown, true);
       }
+
+      installSingleListener(window.parent);
+      if (window.top !== window.parent) installSingleListener(window.top);
+      installSingleListener(window);
 
       send("streamlit:componentReady", { apiVersion: 1 });
       send("streamlit:setFrameHeight", { height: 0 });
