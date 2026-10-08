@@ -11,6 +11,7 @@ import streamlit as st
 from algorithms import ALGORITHMS
 from core.maze import Maze, example_maze, random_maze
 from core.metrics import result_row
+from ui.keyboard_component import direction_for_key, keyboard_event
 from ui.visualization import LABELS, maze_figure
 
 
@@ -35,6 +36,7 @@ def init_state() -> None:
         "sim_maze": None,
         "sim_results": None,
         "editor_version": 0,
+        "last_keyboard_event": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -49,6 +51,7 @@ def clear_run_state() -> None:
     st.session_state.human_result = None
     st.session_state.sim_maze = None
     st.session_state.sim_results = None
+    st.session_state.last_keyboard_event = None
 
 
 def replace_maze(maze: Maze) -> None:
@@ -194,6 +197,20 @@ def move_human(direction: tuple[int, int]) -> None:
             }
 
 
+def handle_keyboard_event(event: dict[str, str] | None) -> None:
+    """Route one new browser key event through the existing movement function."""
+
+    if not event or not st.session_state.human_active:
+        return
+    event_id = event.get("id")
+    if not event_id or event_id == st.session_state.last_keyboard_event:
+        return
+    st.session_state.last_keyboard_event = event_id
+    direction = direction_for_key(event.get("key", ""))
+    if direction is not None:
+        move_human(direction)
+
+
 def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
     st.subheader("Human vs AI Simulation")
     st.write("Start an attempt to freeze a copy of the current maze. Every AI algorithm then receives that exact same copy.")
@@ -209,6 +226,9 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             "Time (ms)": 0.0,
         }
         st.session_state.sim_results = None
+        st.session_state.last_keyboard_event = None
+
+    handle_keyboard_event(keyboard_event(active=st.session_state.human_active))
 
     active_maze = st.session_state.sim_maze or maze
     human_path = st.session_state.human_path
@@ -221,6 +241,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
         elapsed = time.perf_counter() - st.session_state.human_started
         st.write(f"Current position: **{current}** · Moves: **{len(human_path) - 1}** · Time: **{elapsed:.2f} s**")
         st.caption(f"Current path: {human_path}")
+        st.caption("Keyboard: Arrow Keys or WASD")
         _, up, _ = st.columns(3)
         up.button("↑ Up", on_click=move_human, args=((-1, 0),), use_container_width=True)
         left, down, right = st.columns(3)

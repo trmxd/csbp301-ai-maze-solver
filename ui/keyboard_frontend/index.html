@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Maze keyboard controls</title>
+  </head>
+  <body style="margin:0;height:0;overflow:hidden">
+    <script>
+      let active = false;
+      const movementKeys = new Set([
+        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+        "w", "a", "s", "d"
+      ]);
+
+      function send(type, extra = {}) {
+        window.parent.postMessage(
+          { isStreamlitMessage: true, type, ...extra }, "*"
+        );
+      }
+
+      function isTextInput(target) {
+        const tag = (target && target.tagName || "").toLowerCase();
+        return tag === "input" || tag === "textarea" || tag === "select" ||
+          Boolean(target && target.isContentEditable);
+      }
+
+      function humanTabIsVisible() {
+        try {
+          return window.frameElement && window.frameElement.offsetParent !== null;
+        } catch (_) {
+          return true;
+        }
+      }
+
+      function onKeyDown(event) {
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        if (!active || !humanTabIsVisible() || !movementKeys.has(key) || isTextInput(event.target)) {
+          return;
+        }
+        event.preventDefault();
+        send("streamlit:setComponentValue", {
+          value: { key, id: `${Date.now()}-${Math.random()}` },
+          dataType: "json"
+        });
+      }
+
+      window.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "streamlit:render") {
+          active = Boolean(event.data.args && event.data.args.active);
+        }
+      });
+
+      try {
+        const parentWindow = window.parent;
+        const parentDocument = parentWindow.document;
+        if (parentWindow.__mazeKeyboardHandler) {
+          parentDocument.removeEventListener(
+            "keydown", parentWindow.__mazeKeyboardHandler, true
+          );
+        }
+        parentWindow.__mazeKeyboardHandler = onKeyDown;
+        parentDocument.addEventListener("keydown", onKeyDown, true);
+      } catch (_) {
+        document.addEventListener("keydown", onKeyDown, true);
+      }
+
+      send("streamlit:componentReady", { apiVersion: 1 });
+      send("streamlit:setFrameHeight", { height: 0 });
+    </script>
+  </body>
+</html>

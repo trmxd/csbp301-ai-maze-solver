@@ -54,7 +54,7 @@ Manhattan distance is `abs(row1-row2) + abs(col1-col2)`. It matches a grid where
 
 ## 9. Human vs AI simulation
 
-Click **Start Human Attempt** to freeze a copy of the current maze. Move with the four on-screen arrow buttons. The application records the path, move count, distinct visited cells, and elapsed time. **Run AI Simulation** runs all five algorithms on that same frozen maze and animates each result before displaying one comparison table.
+Click **Start Human Attempt** to freeze a copy of the current maze. Move with the unchanged on-screen arrow buttons or use the keyboard Arrow Keys/WASD. Both inputs call the same validated movement function. The application records the path, move count, distinct visited cells, and elapsed time. **Run AI Simulation** runs all five algorithms on that same frozen maze and animates each result before displaying one comparison table.
 
 ## 10. Evaluation metrics
 
@@ -94,7 +94,7 @@ They cover Start equals Goal, a straight path, obstacles, no path, multiple rout
 - All moves have cost 1; terrain with different costs is not included.
 - The grid is limited to 20×20 to keep animations readable and lightweight.
 - Streamlit animations run synchronously, so there is Play/Replay and Reset but no mid-animation Pause.
-- Manual movement uses on-screen controls rather than global keyboard capture, avoiding an extra component dependency.
+- Keyboard movement is captured by a tiny local browser component and is enabled only while the Human tab is visible and an attempt is active.
 - Algorithm timings on very small mazes can vary between runs because they are below one millisecond.
 
 ## 14. Future improvements
