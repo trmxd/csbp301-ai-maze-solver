@@ -79,6 +79,8 @@ The sidebar selects Start and Goal, loads either predefined example, creates a r
 
 The maze is deliberately rendered at a compact fixed size so the controls, results, and comparison table remain visible on ordinary laptop screens.
 
+The search visualization animates every expanded node with an active-node ring and progress indicator, then draws the final route step by step. Lightweight CSS adds a polished entrance, hero panel, metric cards, and button feedback without adding frontend dependencies.
+
 ## 12. Testing
 
 The tests use the Python standard-library `unittest` runner:

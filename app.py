@@ -24,6 +24,49 @@ ALGORITHM_EXPLANATIONS = {
 }
 
 
+def apply_app_style() -> None:
+    """Add lightweight visual polish without external dependencies."""
+
+    st.markdown(
+        """
+        <style>
+        @keyframes appEnter {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 0 rgba(56, 189, 248, 0); }
+            50% { box-shadow: 0 0 24px rgba(56, 189, 248, .18); }
+        }
+        .stMainBlockContainer { animation: appEnter .45s ease-out; padding-top: 2rem; }
+        .maze-hero {
+            padding: 1.15rem 1.35rem; margin-bottom: 1rem; border-radius: 18px;
+            border: 1px solid rgba(56, 189, 248, .25);
+            background: linear-gradient(120deg, rgba(14,165,233,.12), rgba(99,102,241,.08));
+            animation: glow 4s ease-in-out infinite;
+        }
+        .maze-hero h1 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.65rem); }
+        .maze-hero p { margin: .35rem 0 0; color: #64748b; }
+        div[data-testid="stMetric"] {
+            border: 1px solid rgba(148,163,184,.25); border-radius: 14px;
+            padding: .75rem 1rem; background: rgba(148,163,184,.06);
+            transition: transform .18s ease, border-color .18s ease;
+        }
+        div[data-testid="stMetric"]:hover { transform: translateY(-2px); border-color: #38bdf8; }
+        div.stButton > button {
+            border-radius: 10px; transition: transform .16s ease, box-shadow .16s ease;
+        }
+        div.stButton > button:hover {
+            transform: translateY(-1px); box-shadow: 0 7px 18px rgba(15,23,42,.12);
+        }
+        div[data-testid="stImage"] img { border-radius: 14px; }
+        div[data-testid="stTabs"] button[role="tab"] { font-weight: 650; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def init_state() -> None:
     defaults = {
         "maze": example_maze("Example 1 — Clear path"),
@@ -121,24 +164,46 @@ def animate_result(
 ) -> None:
     label = label if label is not None else st.empty()
     canvas = canvas if canvas is not None else st.empty()
+    progress = st.progress(0, text=f"Preparing {result.algorithm} animation…")
     delay = max(0.0, speed)
+    total_steps = max(1, len(result.explored_order) + len(result.path))
+    completed_steps = 0
     explored: list[tuple[int, int]] = []
     for index, cell in enumerate(result.explored_order, start=1):
         explored.append(cell)
         label.caption(f"{title}{result.algorithm}: expanding {cell} ({index}/{len(result.explored_order)})")
-        fig = maze_figure(maze, explored=explored, scores=result.scores, show_scores=show_scores)
+        fig = maze_figure(
+            maze, explored=explored, active=cell, scores=result.scores,
+            show_scores=show_scores,
+        )
         canvas.pyplot(fig, clear_figure=True, width="content")
         plt.close(fig)
+        completed_steps += 1
+        progress.progress(
+            completed_steps / total_steps,
+            text=f"Exploring · {index}/{len(result.explored_order)} nodes",
+        )
         time.sleep(delay)
     shown_path: list[tuple[int, int]] = []
     for cell in result.path:
         shown_path.append(cell)
         label.caption(f"{title}{result.algorithm}: drawing final path")
-        fig = maze_figure(maze, explored=explored, path=shown_path, scores=result.scores, show_scores=show_scores)
+        fig = maze_figure(
+            maze, explored=explored, path=shown_path, active=cell,
+            scores=result.scores, show_scores=show_scores,
+        )
         canvas.pyplot(fig, clear_figure=True, width="content")
         plt.close(fig)
+        completed_steps += 1
+        progress.progress(
+            completed_steps / total_steps,
+            text=f"Drawing route · {len(shown_path)}/{len(result.path)} steps",
+        )
         time.sleep(delay)
     label.caption(f"{title}{result.algorithm}: animation complete")
+    progress.progress(1.0, text=f"{result.algorithm} animation complete ✓")
+    time.sleep(min(delay, 0.08))
+    progress.empty()
 
 
 def run_all(maze: Maze):
@@ -357,8 +422,16 @@ def sidebar_controls() -> tuple[str, float, bool]:
 def main() -> None:
     st.set_page_config(page_title="CSBP301 AI Maze Solver", page_icon="🧭", layout="wide")
     init_state()
-    st.title("CSBP301 AI Maze Solver")
-    st.caption("Search & Path Planning using A*, BFS, DFS, UCS and Greedy Search")
+    apply_app_style()
+    st.markdown(
+        """
+        <div class="maze-hero">
+            <h1>🧭 CSBP301 AI Maze Solver</h1>
+            <p>Watch intelligent search come alive — build, solve and compare paths in real time.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     algorithm, speed, show_scores = sidebar_controls()
     maze = st.session_state.maze
     solver, human = st.tabs(["AI Maze Solver", "Human vs AI Simulation"])
