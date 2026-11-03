@@ -11,6 +11,7 @@ import streamlit as st
 from algorithms import ALGORITHMS
 from core.maze import Maze, example_maze, random_maze
 from core.metrics import result_row
+from ui.browser_animation import render_browser_animation
 from ui.keyboard_component import direction_for_key, keyboard_event
 from ui.visualization import LABELS, maze_figure
 
@@ -39,6 +40,10 @@ def apply_app_style() -> None:
             50% { box-shadow: 0 0 24px rgba(56, 189, 248, .18); }
         }
         .stMainBlockContainer { animation: appEnter .45s ease-out; padding-top: 2rem; }
+        section[data-testid="stSidebar"] > div {
+            border-right: 1px solid rgba(148,163,184,.18);
+            background: linear-gradient(180deg, rgba(14,165,233,.055), transparent 40%);
+        }
         .maze-hero {
             padding: 1.15rem 1.35rem; margin-bottom: 1rem; border-radius: 18px;
             border: 1px solid rgba(56, 189, 248, .25);
@@ -61,6 +66,12 @@ def apply_app_style() -> None:
         }
         div[data-testid="stImage"] img { border-radius: 14px; }
         div[data-testid="stTabs"] button[role="tab"] { font-weight: 650; }
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 18px; border-color: rgba(148,163,184,.24);
+            background: linear-gradient(145deg, rgba(148,163,184,.055), rgba(56,189,248,.025));
+            box-shadow: 0 10px 30px rgba(15,23,42,.055);
+        }
+        div[data-testid="stProgress"] > div > div { border-radius: 99px; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -158,52 +169,10 @@ def animate_result(
     result,
     speed: float,
     show_scores: bool,
-    title: str = "",
-    label=None,
-    canvas=None,
 ) -> None:
-    label = label if label is not None else st.empty()
-    canvas = canvas if canvas is not None else st.empty()
-    progress = st.progress(0, text=f"Preparing {result.algorithm} animation…")
-    delay = max(0.0, speed)
-    total_steps = max(1, len(result.explored_order) + len(result.path))
-    completed_steps = 0
-    explored: list[tuple[int, int]] = []
-    for index, cell in enumerate(result.explored_order, start=1):
-        explored.append(cell)
-        label.caption(f"{title}{result.algorithm}: expanding {cell} ({index}/{len(result.explored_order)})")
-        fig = maze_figure(
-            maze, explored=explored, active=cell, scores=result.scores,
-            show_scores=show_scores,
-        )
-        canvas.pyplot(fig, clear_figure=True, width="content")
-        plt.close(fig)
-        completed_steps += 1
-        progress.progress(
-            completed_steps / total_steps,
-            text=f"Exploring · {index}/{len(result.explored_order)} nodes",
-        )
-        time.sleep(delay)
-    shown_path: list[tuple[int, int]] = []
-    for cell in result.path:
-        shown_path.append(cell)
-        label.caption(f"{title}{result.algorithm}: drawing final path")
-        fig = maze_figure(
-            maze, explored=explored, path=shown_path, active=cell,
-            scores=result.scores, show_scores=show_scores,
-        )
-        canvas.pyplot(fig, clear_figure=True, width="content")
-        plt.close(fig)
-        completed_steps += 1
-        progress.progress(
-            completed_steps / total_steps,
-            text=f"Drawing route · {len(shown_path)}/{len(result.path)} steps",
-        )
-        time.sleep(delay)
-    label.caption(f"{title}{result.algorithm}: animation complete")
-    progress.progress(1.0, text=f"{result.algorithm} animation complete ✓")
-    time.sleep(min(delay, 0.08))
-    progress.empty()
+    """Render search steps in the browser so Python remains responsive."""
+
+    render_browser_animation(maze, [result], speed, show_scores)
 
 
 def run_all(maze: Maze):
@@ -211,7 +180,7 @@ def run_all(maze: Maze):
 
 
 def solver_tab(maze: Maze, algorithm: str, speed: float, show_scores: bool) -> None:
-    st.subheader("Build the maze")
+    st.subheader("🧱 Build the maze")
     edit_maze(maze, f"solver_editor_{st.session_state.editor_version}")
     show_legend()
     fig = maze_figure(maze)
@@ -223,23 +192,30 @@ def solver_tab(maze: Maze, algorithm: str, speed: float, show_scores: bool) -> N
     if right.button("Reset Visualization", use_container_width=True):
         st.session_state.result = None
 
+    animation_shown = False
     if solve:
         st.session_state.result = ALGORITHMS[algorithm](maze.copy())
         animate_result(maze, st.session_state.result, speed, show_scores and algorithm == "A*")
+        animation_shown = True
     elif replay and st.session_state.result is not None:
         animate_result(maze, st.session_state.result, speed, show_scores and st.session_state.result.algorithm == "A*")
+        animation_shown = True
 
     result = st.session_state.result
     if result is not None:
         display_result(result)
-        fig = maze_figure(
-            maze,
-            explored=result.explored_order,
-            path=result.path,
-            scores=result.scores,
-            show_scores=show_scores and result.algorithm == "A*",
-        )
-        show_maze(fig)
+        # The browser animation already ends on the complete route. Keep the
+        # static final view only for later Streamlit reruns so the page does
+        # not show the same maze twice immediately after Solve/Replay.
+        if not animation_shown:
+            fig = maze_figure(
+                maze,
+                explored=result.explored_order,
+                path=result.path,
+                scores=result.scores,
+                show_scores=show_scores and result.algorithm == "A*",
+            )
+            show_maze(fig)
 
     st.info(ALGORITHM_EXPLANATIONS[algorithm], icon="🧠")
     if st.button("Compare all algorithms on this maze"):
@@ -290,8 +266,8 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
 
     ai_col, human_col = st.columns(2, gap="large")
 
-    with human_col:
-        st.markdown("#### Human Attempt")
+    with human_col.container(border=True):
+        st.markdown("#### 🎮 Human Attempt")
         if st.button("Start Human Attempt", type="primary"):
             st.session_state.sim_maze = maze.copy()
             st.session_state.human_path = [maze.start]
@@ -330,23 +306,18 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
         else:
             st.caption("Click Start Human Attempt to enable the movement controls.")
 
-    with ai_col:
-        st.markdown("#### AI Simulation")
+    with ai_col.container(border=True):
+        st.markdown("#### 🤖 AI Simulation")
         run_ai = st.button("Run AI Simulation", disabled=st.session_state.sim_maze is None)
         if run_ai:
             st.session_state.sim_results = run_all(active_maze)
-            ai_label = st.empty()
-            ai_canvas = st.empty()
-            for result in st.session_state.sim_results:
-                animate_result(
-                    active_maze,
-                    result,
-                    speed,
-                    show_scores and result.algorithm == "A*",
-                    title="AI simulation · ",
-                    label=ai_label,
-                    canvas=ai_canvas,
-                )
+            render_browser_animation(
+                active_maze,
+                st.session_state.sim_results,
+                speed,
+                show_scores,
+                height=570 if active_maze.rows <= 12 else 650,
+            )
         elif st.session_state.sim_results:
             result = st.session_state.sim_results[-1]
             st.caption(f"Latest AI view: {result.algorithm}")
@@ -434,7 +405,7 @@ def main() -> None:
     )
     algorithm, speed, show_scores = sidebar_controls()
     maze = st.session_state.maze
-    solver, human = st.tabs(["AI Maze Solver", "Human vs AI Simulation"])
+    solver, human = st.tabs(["🤖 AI Maze Solver", "🎮 Human vs AI Simulation"])
     with solver:
         solver_tab(maze, algorithm, speed, show_scores)
     with human:

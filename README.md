@@ -79,7 +79,7 @@ The sidebar selects Start and Goal, loads either predefined example, creates a r
 
 The maze is deliberately rendered at a compact fixed size so the controls, results, and comparison table remain visible on ordinary laptop screens.
 
-The search visualization animates every expanded node with an active-node ring and progress indicator, then draws the final route step by step. Lightweight CSS adds a polished entrance, hero panel, metric cards, and button feedback without adding frontend dependencies.
+The search visualization runs in a lightweight browser-side grid, animating every expanded node and drawing the final route step by step without blocking Streamlit. It includes progress, pause/resume, skip, and replay controls. Lightweight CSS adds a polished entrance, hero panel, bordered simulation cards, metric cards, and button feedback without adding frontend dependencies.
 
 ## 12. Testing
 
@@ -95,7 +95,7 @@ They cover Start equals Goal, a straight path, obstacles, no path, multiple rout
 
 - All moves have cost 1; terrain with different costs is not included.
 - The grid is limited to 20×20 to keep animations readable and lightweight.
-- Streamlit animations run synchronously, so there is Play/Replay and Reset but no mid-animation Pause.
+- Animation is visual only; pausing or skipping it does not change the already-computed algorithm result.
 - Keyboard movement is captured by a tiny local browser component and is enabled only while the Human tab is visible and an attempt is active.
 - Algorithm timings on very small mazes can vary between runs because they are below one millisecond.
 
