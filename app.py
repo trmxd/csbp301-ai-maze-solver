@@ -240,7 +240,7 @@ def move_human(direction: tuple[int, int]) -> None:
                 "Solved?": "Yes",
                 "Path Length": len(st.session_state.human_path) - 1,
                 "Path Cost": len(st.session_state.human_path) - 1,
-                "Expanded Nodes": "—",
+                "Expanded Nodes": None,
                 "Visited Nodes": len(set(st.session_state.human_path)),
                 "Time (ms)": round(elapsed * 1000, 3),
             }
@@ -275,7 +275,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             st.session_state.human_active = maze.start != maze.goal
             st.session_state.human_result = None if maze.start != maze.goal else {
                 "Method": "Human", "Solved?": "Yes", "Path Length": 0,
-                "Path Cost": 0, "Expanded Nodes": "—", "Visited Nodes": 1,
+                "Path Cost": 0, "Expanded Nodes": None, "Visited Nodes": 1,
                 "Time (ms)": 0.0,
             }
             st.session_state.sim_results = None
@@ -341,7 +341,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             elapsed = time.perf_counter() - st.session_state.human_started if st.session_state.human_started else 0
             rows.append({
                 "Method": "Human", "Solved?": "No", "Path Length": len(human_path) - 1,
-                "Path Cost": len(human_path) - 1, "Expanded Nodes": "—",
+                "Path Cost": len(human_path) - 1, "Expanded Nodes": None,
                 "Visited Nodes": len(set(human_path)), "Time (ms)": round(elapsed * 1000, 3),
             })
         rows.extend(result_row(result) for result in st.session_state.sim_results)
