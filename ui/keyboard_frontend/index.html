@@ -3,14 +3,102 @@
   <head>
     <meta charset="utf-8" />
     <title>Maze keyboard controls</title>
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; overflow: hidden; background: transparent; }
+      #maze {
+        display: grid; gap: 2px; padding: 5px; margin: 0 auto;
+        width: min(100%, 420px); border-radius: 14px; background: #94a3b8;
+      }
+      .cell {
+        min-width: 0; min-height: 0; border-radius: 3px; background: #f8fafc;
+        transition: background .08s linear, transform .08s ease, box-shadow .08s ease;
+      }
+      .wall { background: #1f2937; }
+      .human-path { background: #c084fc; }
+      .start { background: #22c55e; }
+      .goal { background: #ef4444; }
+      .current {
+        background: #fb923c; transform: scale(.82);
+        box-shadow: 0 0 0 3px rgba(249,115,22,.42);
+      }
+    </style>
   </head>
-  <body style="margin:0;height:0;overflow:hidden">
+  <body>
+    <div id="maze" aria-label="Human maze"></div>
     <script>
       const movementKeys = new Set([
         "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
         "w", "a", "s", "d"
       ]);
       const BATCH_WINDOW_MS = 45;
+      const directions = {
+        ArrowUp: [-1, 0], w: [-1, 0],
+        ArrowDown: [1, 0], s: [1, 0],
+        ArrowLeft: [0, -1], a: [0, -1],
+        ArrowRight: [0, 1], d: [0, 1]
+      };
+      const mazeElement = document.getElementById("maze");
+      let preview = null;
+
+      const cellKey = ([row, col]) => `${row}-${col}`;
+
+      function applyPreviewMove(key) {
+        if (!preview || !preview.enabled) return;
+        const direction = directions[key];
+        if (!direction) return;
+        const current = preview.path[preview.path.length - 1] || preview.start;
+        const target = [current[0] + direction[0], current[1] + direction[1]];
+        const inside = target[0] >= 0 && target[0] < preview.rows &&
+          target[1] >= 0 && target[1] < preview.cols;
+        if (!inside || preview.walls.has(cellKey(target))) return;
+        preview.path.push(target);
+        paintMaze();
+      }
+
+      function paintMaze() {
+        if (!preview) return;
+        const path = new Set(preview.path.map(cellKey));
+        const current = cellKey(preview.path[preview.path.length - 1] || preview.start);
+        for (const [id, cell] of preview.cells) {
+          cell.className = "cell";
+          if (preview.walls.has(id)) cell.classList.add("wall");
+          if (path.has(id)) cell.classList.add("human-path");
+          if (id === cellKey(preview.start)) cell.classList.add("start");
+          if (id === cellKey(preview.goal)) cell.classList.add("goal");
+          if (id === current && id !== cellKey(preview.start) && id !== cellKey(preview.goal)) {
+            cell.classList.add("current");
+          }
+        }
+      }
+
+      function renderMaze(state, pendingEvents) {
+        if (!state || !state.maze) return;
+        const maze = state.maze;
+        mazeElement.innerHTML = "";
+        mazeElement.style.gridTemplateColumns = `repeat(${maze.cols}, 1fr)`;
+        mazeElement.style.aspectRatio = `${maze.cols} / ${maze.rows}`;
+        const cells = new Map();
+        for (let row = 0; row < maze.rows; row++) {
+          for (let col = 0; col < maze.cols; col++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.style.aspectRatio = "1";
+            mazeElement.appendChild(cell);
+            cells.set(`${row}-${col}`, cell);
+          }
+        }
+        preview = {
+          enabled: Boolean(state.enabled), rows: maze.rows, cols: maze.cols,
+          start: maze.start, goal: maze.goal, walls: new Set(maze.walls.map(cellKey)),
+          path: (state.path && state.path.length ? state.path : [maze.start]).map(cell => [...cell]),
+          cells
+        };
+        for (const item of pendingEvents) applyPreviewMove(item.key);
+        paintMaze();
+        send("streamlit:setFrameHeight", { height: Math.ceil(mazeElement.getBoundingClientRect().height) + 2 });
+      }
 
       function send(type, extra = {}) {
         window.parent.postMessage(
@@ -32,13 +120,13 @@
         }
       }
 
-      function installController(targetWindow) {
+      function installController(targetWindow, sharedController = null) {
         try {
           const targetDocument = targetWindow.document;
 
           // The controller lives on the parent window, so its queue survives
           // destruction/recreation of this iframe during Streamlit reruns.
-          const controller = targetWindow.__mazeKeyboardController || {
+          const controller = sharedController || targetWindow.__mazeKeyboardController || {
             version: 2,
             active: false,
             history: [],
@@ -83,6 +171,7 @@
             // Separate fast presses still work because each has its own keyup.
             if (event.repeat || controller.pressed.has(key)) return;
             controller.pressed.add(key);
+            if (controller.previewMove) controller.previewMove(key);
             controller.history.push({ sequence: ++controller.sequence, key });
             controller.schedule();
           }
@@ -113,15 +202,13 @@
         }
       }
 
-      const controllers = [];
       const parentController = installController(window.parent);
-      if (parentController) controllers.push(parentController);
       if (window.top !== window.parent) {
-        const topController = installController(window.top);
-        if (topController && !controllers.includes(topController)) controllers.push(topController);
+        installController(window.top, parentController);
       }
-      const localController = installController(window);
-      if (localController && !controllers.includes(localController)) controllers.push(localController);
+      const primaryController = parentController || installController(window);
+      installController(window, primaryController);
+      const controllers = primaryController ? [primaryController] : [];
 
       function sendBatch(value) {
         send("streamlit:setComponentValue", { value, dataType: "json" });
@@ -147,6 +234,7 @@
           }
           controller.active = isActive;
           controller.sender = sendBatch;
+          controller.previewMove = applyPreviewMove;
           controller.lastVisible = humanTabIsVisible();
           controller.visible = () => {
             try {
@@ -168,11 +256,15 @@
             if (controller.timer) clearTimeout(controller.timer);
             controller.timer = null;
           }
+
+          const acknowledged = Number(activeArg && activeArg.acknowledged || 0);
+          const pending = controller.history.filter(item => item.sequence > acknowledged);
+          renderMaze(activeArg, pending);
         }
       });
 
       send("streamlit:componentReady", { apiVersion: 1 });
-      send("streamlit:setFrameHeight", { height: 0 });
+      send("streamlit:setFrameHeight", { height: 360 });
     </script>
   </body>
 </html>

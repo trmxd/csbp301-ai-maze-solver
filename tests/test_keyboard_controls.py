@@ -213,6 +213,9 @@ class KeyboardControlTests(unittest.TestCase):
         self.assertIn("event.repeat", frontend)
         self.assertIn('addEventListener("keyup"', frontend)
         self.assertIn("isTextInput(event.target)", frontend)
+        self.assertIn("controller.previewMove(key)", frontend)
+        self.assertIn("function applyPreviewMove(key)", frontend)
+        self.assertIn("item.sequence > acknowledged", frontend)
 
 
 if __name__ == "__main__":

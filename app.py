@@ -319,16 +319,27 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             st.session_state.last_keyboard_sequence = 0
             st.session_state.keyboard_attempt_id += 1
 
+        active_maze = st.session_state.sim_maze or maze
+        human_path = st.session_state.human_path
         handle_keyboard_event(keyboard_event({
             "enabled": st.session_state.human_active,
             "attempt": st.session_state.keyboard_attempt_id,
+            "acknowledged": st.session_state.last_keyboard_sequence,
+            "maze": {
+                "rows": active_maze.rows,
+                "cols": active_maze.cols,
+                "start": list(active_maze.start),
+                "goal": list(active_maze.goal),
+                "walls": [list(cell) for cell in sorted(active_maze.walls)],
+            },
+            "path": [list(cell) for cell in human_path],
         }))
 
-        active_maze = st.session_state.sim_maze or maze
+        # Keyboard movement is previewed instantly inside the persistent
+        # browser component above. Python still applies the same move_human()
+        # validation and owns the canonical path/metrics.
         human_path = st.session_state.human_path
         current = human_path[-1] if human_path else active_maze.start
-        fig = maze_figure(active_maze, human_path=human_path, current=current)
-        show_maze(fig)
         show_legend()
 
         if st.session_state.human_active:

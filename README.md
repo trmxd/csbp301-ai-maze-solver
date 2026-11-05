@@ -58,6 +58,8 @@ Click **Start Human Attempt** to freeze a copy of the current maze. The Human at
 
 Rapid keyboard presses are buffered briefly in the local browser component and sent as an ordered, numbered history. Python processes only unseen sequence numbers, so a newer Streamlit component value can recover presses coalesced during a rerun without duplicating movement. OS key-repeat is ignored until keyup; normal separate presses remain responsive.
 
+The Human maze itself is rendered by that persistent local component. Keyboard moves are previewed immediately in the browser while the ordered history synchronizes with Streamlit, preventing the maze from disappearing during Python reruns. `move_human()` remains the canonical validator for walls, boundaries, path tracking, timing, and completion.
+
 ## 10. Evaluation metrics
 
 - **Solved:** whether Goal was reached.
