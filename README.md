@@ -56,6 +56,8 @@ Manhattan distance is `abs(row1-row2) + abs(col1-col2)`. It matches a grid where
 
 Click **Start Human Attempt** to freeze a copy of the current maze. The Human attempt appears on the right and the AI simulation appears on the left for direct visual comparison. Move with the unchanged on-screen arrow buttons or use the keyboard Arrow Keys/WASD. Both inputs call the same validated movement function. The application records the path, move count, distinct visited cells, and elapsed time. **Run AI Simulation** runs all five algorithms on that same frozen maze and animates each result before displaying one comparison table.
 
+Rapid keyboard presses are buffered briefly in the local browser component and sent as an ordered, numbered history. Python processes only unseen sequence numbers, so a newer Streamlit component value can recover presses coalesced during a rerun without duplicating movement. OS key-repeat is ignored until keyup; normal separate presses remain responsive.
+
 ## 10. Evaluation metrics
 
 - **Solved:** whether Goal was reached.

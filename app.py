@@ -91,6 +91,8 @@ def init_state() -> None:
         "sim_results": None,
         "editor_version": 0,
         "last_keyboard_event": None,
+        "last_keyboard_sequence": 0,
+        "keyboard_attempt_id": 0,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -106,6 +108,7 @@ def clear_run_state() -> None:
     st.session_state.sim_maze = None
     st.session_state.sim_results = None
     st.session_state.last_keyboard_event = None
+    st.session_state.last_keyboard_sequence = 0
 
 
 def replace_maze(maze: Maze) -> None:
@@ -246,8 +249,8 @@ def move_human(direction: tuple[int, int]) -> None:
             }
 
 
-def handle_keyboard_event(event: dict[str, str] | None) -> None:
-    """Route one new browser key event through the existing movement function."""
+def handle_keyboard_event(event: dict[str, object] | None) -> None:
+    """Route one ordered browser key batch through existing movement logic."""
 
     if not event or not st.session_state.human_active:
         return
@@ -255,9 +258,42 @@ def handle_keyboard_event(event: dict[str, str] | None) -> None:
     if not event_id or event_id == st.session_state.last_keyboard_event:
         return
     st.session_state.last_keyboard_event = event_id
-    direction = direction_for_key(event.get("key", ""))
-    if direction is not None:
-        move_human(direction)
+
+    events = event.get("events")
+    if isinstance(events, list):
+        if event.get("attempt") != st.session_state.keyboard_attempt_id:
+            return
+        for item in events:
+            if not isinstance(item, dict):
+                continue
+            sequence = item.get("sequence")
+            key = item.get("key")
+            if not isinstance(sequence, int) or sequence <= st.session_state.last_keyboard_sequence:
+                continue
+            st.session_state.last_keyboard_sequence = sequence
+            if not st.session_state.human_active:
+                break
+            if isinstance(key, str):
+                direction = direction_for_key(key)
+                if direction is not None:
+                    move_human(direction)
+        return
+
+    # Accept the legacy single-key shape as well as the new batched shape so
+    # an in-flight event from an older deployed component is still safe.
+    keys = event.get("keys")
+    if not isinstance(keys, list):
+        legacy_key = event.get("key")
+        keys = [legacy_key] if isinstance(legacy_key, str) else []
+
+    for key in keys:
+        if not st.session_state.human_active:
+            break
+        if not isinstance(key, str):
+            continue
+        direction = direction_for_key(key)
+        if direction is not None:
+            move_human(direction)
 
 
 def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
@@ -280,8 +316,13 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             }
             st.session_state.sim_results = None
             st.session_state.last_keyboard_event = None
+            st.session_state.last_keyboard_sequence = 0
+            st.session_state.keyboard_attempt_id += 1
 
-        handle_keyboard_event(keyboard_event(active=st.session_state.human_active))
+        handle_keyboard_event(keyboard_event(
+            active=st.session_state.human_active,
+            attempt=st.session_state.keyboard_attempt_id,
+        ))
 
         active_maze = st.session_state.sim_maze or maze
         human_path = st.session_state.human_path

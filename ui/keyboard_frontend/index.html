@@ -6,11 +6,11 @@
   </head>
   <body style="margin:0;height:0;overflow:hidden">
     <script>
-      let active = false;
       const movementKeys = new Set([
         "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
         "w", "a", "s", "d"
       ]);
+      const BATCH_WINDOW_MS = 45;
 
       function send(type, extra = {}) {
         window.parent.postMessage(
@@ -32,42 +32,137 @@
         }
       }
 
-      function onKeyDown(event) {
-        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-        if (!active || !humanTabIsVisible() || !movementKeys.has(key) || isTextInput(event.target)) {
-          return;
-        }
-        event.preventDefault();
-        send("streamlit:setComponentValue", {
-          value: { key, id: `${Date.now()}-${Math.random()}` },
-          dataType: "json"
-        });
-      }
-
-      window.addEventListener("message", (event) => {
-        if (event.data && event.data.type === "streamlit:render") {
-          active = Boolean(event.data.args && event.data.args.active);
-        }
-      });
-
-      function installSingleListener(targetWindow) {
+      function installController(targetWindow) {
         try {
           const targetDocument = targetWindow.document;
+
+          // The controller lives on the parent window, so its queue survives
+          // destruction/recreation of this iframe during Streamlit reruns.
+          const controller = targetWindow.__mazeKeyboardController || {
+            version: 2,
+            active: false,
+            history: [],
+            pressed: new Set(),
+            timer: null,
+            sender: null,
+            visible: () => true,
+            sequence: 0,
+            batchSequence: 0,
+            attempt: null
+          };
+          targetWindow.__mazeKeyboardController = controller;
+
+          controller.flush = function () {
+            if (!this.active || !this.history.length || !this.sender) return;
+            // Send cumulative numbered history. If Streamlit coalesces several
+            // component values during a rerun, the newest value still carries
+            // every earlier press and Python can process only unseen numbers.
+            this.sender({
+              events: this.history.slice(),
+              attempt: this.attempt,
+              id: `batch-${Date.now()}-${++this.batchSequence}`
+            });
+          };
+          controller.schedule = function () {
+            if (!this.active || this.timer || !this.history.length) return;
+            this.timer = targetWindow.setTimeout(() => {
+              this.timer = null;
+              this.flush();
+            }, BATCH_WINDOW_MS);
+          };
+
+          function onKeyDown(event) {
+            const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+            if (!controller.active || !controller.visible() || !movementKeys.has(key) ||
+                isTextInput(event.target)) {
+              return;
+            }
+            event.preventDefault();
+
+            // Ignore OS key-repeat and duplicate keydown events until keyup.
+            // Separate fast presses still work because each has its own keyup.
+            if (event.repeat || controller.pressed.has(key)) return;
+            controller.pressed.add(key);
+            controller.history.push({ sequence: ++controller.sequence, key });
+            controller.schedule();
+          }
+
+          function onKeyUp(event) {
+            const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+            controller.pressed.delete(key);
+          }
+
           if (targetWindow.__mazeKeyboardHandler) {
             targetDocument.removeEventListener(
               "keydown", targetWindow.__mazeKeyboardHandler, true
             );
           }
+          if (targetWindow.__mazeKeyboardKeyupHandler) {
+            targetDocument.removeEventListener(
+              "keyup", targetWindow.__mazeKeyboardKeyupHandler, true
+            );
+          }
           targetWindow.__mazeKeyboardHandler = onKeyDown;
+          targetWindow.__mazeKeyboardKeyupHandler = onKeyUp;
           targetDocument.addEventListener("keydown", onKeyDown, true);
+          targetDocument.addEventListener("keyup", onKeyUp, true);
+          return controller;
         } catch (_) {
           // Cross-origin parents are skipped; the component document is the fallback.
+          return null;
         }
       }
 
-      installSingleListener(window.parent);
-      if (window.top !== window.parent) installSingleListener(window.top);
-      installSingleListener(window);
+      const controllers = [];
+      const parentController = installController(window.parent);
+      if (parentController) controllers.push(parentController);
+      if (window.top !== window.parent) {
+        const topController = installController(window.top);
+        if (topController && !controllers.includes(topController)) controllers.push(topController);
+      }
+      const localController = installController(window);
+      if (localController && !controllers.includes(localController)) controllers.push(localController);
+
+      function sendBatch(value) {
+        send("streamlit:setComponentValue", { value, dataType: "json" });
+      }
+
+      window.addEventListener("message", (event) => {
+        if (!event.data || event.data.type !== "streamlit:render") return;
+        const isActive = Boolean(event.data.args && event.data.args.active);
+        const attempt = event.data.args && event.data.args.attempt;
+        for (const controller of controllers) {
+          if (controller.attempt !== attempt) {
+            controller.attempt = attempt;
+            controller.history.length = 0;
+            controller.sequence = 0;
+            controller.batchSequence = 0;
+          }
+          controller.active = isActive;
+          controller.sender = sendBatch;
+          controller.lastVisible = humanTabIsVisible();
+          controller.visible = () => {
+            try {
+              const frame = window.frameElement;
+              // Keep the last visibility value during the short iframe swap
+              // of a rerun, then refresh it once the new frame is connected.
+              if (frame && frame.isConnected) {
+                controller.lastVisible = frame.offsetParent !== null;
+              }
+              return controller.lastVisible;
+            } catch (_) {
+              return true;
+            }
+          };
+
+          if (!isActive) {
+            controller.history.length = 0;
+            controller.pressed.clear();
+            if (controller.timer) clearTimeout(controller.timer);
+            controller.timer = null;
+          }
+        }
+      });
 
       send("streamlit:componentReady", { apiVersion: 1 });
       send("streamlit:setFrameHeight", { height: 0 });
