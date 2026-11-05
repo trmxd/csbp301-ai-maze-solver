@@ -129,8 +129,15 @@
 
       window.addEventListener("message", (event) => {
         if (!event.data || event.data.type !== "streamlit:render") return;
-        const isActive = Boolean(event.data.args && event.data.args.active);
-        const attempt = event.data.args && event.data.args.attempt;
+        const activeArg = event.data.args && event.data.args.active;
+        // The object form keeps the original single Python argument, making
+        // rolling Streamlit deployments compatible with the previous helper.
+        const isActive = typeof activeArg === "object"
+          ? Boolean(activeArg && activeArg.enabled)
+          : Boolean(activeArg);
+        const attempt = typeof activeArg === "object" && activeArg
+          ? activeArg.attempt
+          : 0;
         for (const controller of controllers) {
           if (controller.attempt !== attempt) {
             controller.attempt = attempt;

@@ -319,10 +319,10 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             st.session_state.last_keyboard_sequence = 0
             st.session_state.keyboard_attempt_id += 1
 
-        handle_keyboard_event(keyboard_event(
-            active=st.session_state.human_active,
-            attempt=st.session_state.keyboard_attempt_id,
-        ))
+        handle_keyboard_event(keyboard_event({
+            "enabled": st.session_state.human_active,
+            "attempt": st.session_state.keyboard_attempt_id,
+        }))
 
         active_maze = st.session_state.sim_maze or maze
         human_path = st.session_state.human_path

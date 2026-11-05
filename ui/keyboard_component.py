@@ -32,12 +32,11 @@ def direction_for_key(key: str) -> tuple[int, int] | None:
     return KEY_DIRECTIONS.get(normalized)
 
 
-def keyboard_event(active: bool, attempt: int):
+def keyboard_event(active: bool | dict[str, object]):
     """Return the latest ordered browser key batch during a human attempt."""
 
     return _keyboard_component(
         active=active,
-        attempt=attempt,
         default=None,
         key="human_keyboard",
     )
