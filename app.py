@@ -9,8 +9,11 @@ import pandas as pd
 import streamlit as st
 
 from algorithms import ALGORITHMS
+from arena.store import ArenaStore
+from arena.ui import render_host_tab, render_player_page
 from core.maze import Maze, example_maze, random_maze
 from core.metrics import result_row
+from core.movement import validated_move
 from ui.browser_animation import render_browser_animation
 from ui.keyboard_component import direction_for_key, keyboard_event
 from ui.visualization import LABELS, maze_figure
@@ -72,6 +75,15 @@ def apply_app_style() -> None:
             box-shadow: 0 10px 30px rgba(15,23,42,.055);
         }
         div[data-testid="stProgress"] > div > div { border-radius: 99px; }
+        @media (max-width: 640px) {
+            .stMainBlockContainer { padding: .75rem .65rem 5rem; }
+            .maze-hero { padding: .8rem 1rem; margin-bottom: .65rem; }
+            body:has(.arena-player) div.stButton > button,
+            body:has(.arena-player) button[kind="primary"] {
+                min-height: 56px; font-size: 1.25rem; font-weight: 750;
+            }
+            div[data-testid="stHorizontalBlock"] { gap: .35rem; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -231,9 +243,8 @@ def move_human(direction: tuple[int, int]) -> None:
     maze = st.session_state.sim_maze
     if not st.session_state.human_active or maze is None:
         return
-    row, col = st.session_state.human_path[-1]
-    target = (row + direction[0], col + direction[1])
-    if maze.is_open(target):
+    target = validated_move(maze, st.session_state.human_path[-1], direction)
+    if target is not None:
         st.session_state.human_path.append(target)
         if target == maze.goal:
             elapsed = time.perf_counter() - st.session_state.human_started
@@ -442,10 +453,21 @@ def sidebar_controls() -> tuple[str, float, bool]:
     return algorithm, speed, show_scores
 
 
+@st.cache_resource
+def arena_store() -> ArenaStore:
+    """One process-wide store shared by all Streamlit browser sessions."""
+
+    return ArenaStore()
+
+
 def main() -> None:
     st.set_page_config(page_title="CSBP301 AI Maze Solver", page_icon="🧭", layout="wide")
     init_state()
     apply_app_style()
+    arena_id = st.query_params.get("arena")
+    if arena_id:
+        render_player_page(arena_store(), arena_id, st.query_params.get("player"))
+        return
     st.markdown(
         """
         <div class="maze-hero">
@@ -457,11 +479,17 @@ def main() -> None:
     )
     algorithm, speed, show_scores = sidebar_controls()
     maze = st.session_state.maze
-    solver, human = st.tabs(["🤖 AI Maze Solver", "🎮 Human vs AI Simulation"])
+    solver, human, classroom = st.tabs([
+        "🤖 AI Maze Solver",
+        "🎮 Human vs AI Simulation",
+        "🏆 Class vs AI",
+    ])
     with solver:
         solver_tab(maze, algorithm, speed, show_scores)
     with human:
         human_tab(maze, speed, show_scores)
+    with classroom:
+        render_host_tab(maze, arena_store())
 
 
 if __name__ == "__main__":
