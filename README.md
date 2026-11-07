@@ -19,18 +19,18 @@ The **🏆 Class vs AI** tab adds a real shared classroom round without replacin
 
 1. Open **🏆 Class vs AI** on the presentation laptop.
 2. Click **Create New Class Game**. The app freezes one copy of the currently selected maze and generates a unique game ID.
-3. Display the generated QR code and join URL. The dashboard updates the Joined, Ready, Playing, and Finished counts automatically.
+3. Display the generated QR code and join URL. Students can also open `?join=1` and type the game code manually. The dashboard updates the Joined, Ready, Playing, and Finished counts automatically and lists every player's live status.
 4. Wait for students, then click **Start Round**. Joining closes as soon as play starts.
 5. During play, the A* route and leaderboard remain hidden. The host sees only the shared maze, player names, status, and completion counters.
-6. Click **Reveal AI** to stop movement, calculate the existing A* solution, show the ranked results, and identify students whose valid move count equals the A* shortest path.
-7. Click **End Round** to close a revealed round, or **Reset Round** to clear its players and return the same game to an empty lobby.
+6. Click **End Round** to stop movement and reveal an animated Top 3 podium. Completed players are ranked by moves and then server-recorded elapsed time.
+7. **Reveal AI** remains available as an optional comparison. It is not required for the classroom competition. Use **Reset Round** to clear players and return the same game to an empty lobby.
 
 ### Student workflow
 
-1. Scan the QR code or open the session-specific link.
+1. Scan the QR code, open the session-specific link, or open the code-entry page and type the host's game code.
 2. Enter a unique nickname of 1–20 characters and choose Explorer, Robot, Wizard, or Astronaut.
 3. Wait for the host. A player cannot move in the lobby.
-4. After the host starts, solve the same maze using the large touch arrows. Arrow Keys and WASD also work on devices with keyboards.
+4. After the host starts, solve the same maze using the large phone-friendly touch arrows. Arrow Keys and WASD also work on devices with keyboards.
 5. The server validates every request. Walls and boundaries do not move the player or increase the move count. Repeated finish requests do not alter a completed result.
 
 The leaderboard contains completed players only. It sorts by the lowest valid move count and then the lowest server-recorded elapsed time. Unfinished players remain stored as unfinished and are never given a fabricated result. With unit-cost four-directional movement and the existing admissible Manhattan heuristic, A* is used as the shortest-path benchmark for this mode; the other algorithms remain available in the original solver.

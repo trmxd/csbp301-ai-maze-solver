@@ -7,7 +7,7 @@ from pathlib import Path
 import unittest
 
 from arena.store import ArenaError, ArenaStore
-from arena.ui import join_url, qr_image
+from arena.ui import code_join_url, join_url, qr_image
 from core.maze import Maze
 
 
@@ -176,6 +176,12 @@ class ArenaStoreTests(unittest.TestCase):
         self.assertGreater(len(image), 100)
         with self.assertRaises(ArenaError):
             join_url("example.test/app", "ABC123")
+
+    def test_code_join_url_opens_mobile_code_entry_page(self):
+        self.assertEqual(
+            code_join_url("https://example.test/app"),
+            "https://example.test/app?join=1",
+        )
 
 
 if __name__ == "__main__":

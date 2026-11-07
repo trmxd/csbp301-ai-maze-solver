@@ -10,7 +10,7 @@ import streamlit as st
 
 from algorithms import ALGORITHMS
 from arena.store import ArenaStore
-from arena.ui import render_host_tab, render_player_page
+from arena.ui import render_code_join_page, render_host_tab, render_player_page
 from core.maze import Maze, example_maze, random_maze
 from core.metrics import result_row
 from core.movement import validated_move
@@ -41,6 +41,10 @@ def apply_app_style() -> None:
         @keyframes glow {
             0%, 100% { box-shadow: 0 0 0 rgba(56, 189, 248, 0); }
             50% { box-shadow: 0 0 24px rgba(56, 189, 248, .18); }
+        }
+        @keyframes winnerEnter {
+            from { opacity: 0; transform: translateY(28px) scale(.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .stMainBlockContainer { animation: appEnter .45s ease-out; padding-top: 2rem; }
         section[data-testid="stSidebar"] > div {
@@ -75,12 +79,24 @@ def apply_app_style() -> None:
             box-shadow: 0 10px 30px rgba(15,23,42,.055);
         }
         div[data-testid="stProgress"] > div > div { border-radius: 99px; }
+        .arena-winner {
+            text-align: center; padding: 1rem .75rem; min-height: 190px;
+            border: 1px solid rgba(250,204,21,.35); border-radius: 18px;
+            background: linear-gradient(145deg, rgba(250,204,21,.16), rgba(56,189,248,.08));
+            box-shadow: 0 14px 34px rgba(15,23,42,.14);
+            animation: winnerEnter .65s cubic-bezier(.2,.8,.2,1) both;
+        }
+        .arena-winner-2 { animation-delay: .12s; }
+        .arena-winner-3 { animation-delay: .24s; }
+        .arena-medal { font-size: 2.25rem; }
+        .arena-avatar { font-size: 2.6rem; margin: .2rem 0; }
+        .arena-winner h3, .arena-winner p { margin: .25rem 0; }
         @media (max-width: 640px) {
             .stMainBlockContainer { padding: .75rem .65rem 5rem; }
             .maze-hero { padding: .8rem 1rem; margin-bottom: .65rem; }
             body:has(.arena-player) div.stButton > button,
             body:has(.arena-player) button[kind="primary"] {
-                min-height: 56px; font-size: 1.25rem; font-weight: 750;
+                min-height: 68px; font-size: 1.8rem; font-weight: 750;
             }
             div[data-testid="stHorizontalBlock"] { gap: .35rem; }
         }
@@ -467,6 +483,9 @@ def main() -> None:
     arena_id = st.query_params.get("arena")
     if arena_id:
         render_player_page(arena_store(), arena_id, st.query_params.get("player"))
+        return
+    if st.query_params.get("join") == "1":
+        render_code_join_page(arena_store())
         return
     st.markdown(
         """

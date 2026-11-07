@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from html import escape
 from io import BytesIO
 import os
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import qrcode
 import streamlit as st
 
@@ -26,6 +28,15 @@ def join_url(base_url: str, game_id: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, path, urlencode({"arena": game_id}), ""))
 
 
+def code_join_url(base_url: str) -> str:
+    """Return the mobile landing page where a student can type a game code."""
+
+    parsed = urlsplit(base_url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ArenaError("Enter a complete base URL beginning with http:// or https://")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path or "/", "join=1", ""))
+
+
 def qr_image(url: str):
     qr = qrcode.QRCode(version=None, box_size=8, border=2)
     qr.add_data(url)
@@ -42,26 +53,69 @@ def _show_maze(maze, path=None, current=None) -> None:
     plt.close(fig)
 
 
-def _leaderboard(store: ArenaStore, game_id: str) -> None:
+def _live_players(store: ArenaStore, game_id: str) -> None:
+    """Show names and progress without inventing a rank for unfinished players."""
+
+    players = store.players(game_id)
+    game = store.get_game(game_id)
+    finished = {player.token: index + 1 for index, player in enumerate(store.leaderboard(game_id))}
+    rows = []
+    for player in players:
+        rows.append({
+            "Place": finished.get(player.token, "—"),
+            "Player": f"{AVATARS[player.character]} {player.nickname}",
+            "Status": (
+                "Finished" if player.completed
+                else "Ready" if game.state == "LOBBY"
+                else "Playing" if game.state == "PLAYING"
+                else "Round ended"
+            ),
+            "Moves": player.moves,
+            "Time": f"{player.elapsed:.1f}s" if player.start_time is not None else "—",
+        })
+    st.markdown("#### 👥 Live Players")
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    else:
+        st.caption("Waiting for players to join…")
+
+
+def _leaderboard(store: ArenaStore, game_id: str, *, show_ai: bool) -> None:
     game = store.get_game(game_id)
     leaders = store.leaderboard(game_id)
     st.subheader("🏁 Final Leaderboard")
     if not leaders:
         st.info("No player completed the maze.")
-    for index, player in enumerate(leaders):
-        medal = ["🥇", "🥈", "🥉"][index] if index < 3 else f"#{index + 1}"
-        avatar = AVATARS[player.character]
-        st.markdown(f"### {medal} {avatar} {player.nickname} — {player.moves} moves — {player.elapsed:.1f}s")
-    st.divider()
-    st.subheader("🤖 AI Reveal")
-    st.metric("AI Algorithm", "A*")
-    st.metric("AI Optimal Path", f"{game.ai_path_length} moves" if game.ai_path_length is not None else "No path")
-    if game.ai_path:
+        return
+
+    podium = st.columns(min(3, len(leaders)))
+    for index, player in enumerate(leaders[:3]):
+        medal = ["🥇", "🥈", "🥉"][index]
+        with podium[index]:
+            st.markdown(
+                f"""
+                <div class="arena-winner arena-winner-{index + 1}">
+                    <div class="arena-medal">{medal}</div>
+                    <div class="arena-avatar">{AVATARS[player.character]}</div>
+                    <h3>{escape(player.nickname)}</h3>
+                    <p>{player.moves} moves · {player.elapsed:.1f}s</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    for index, player in enumerate(leaders[3:], start=4):
+        st.write(f"**#{index}** {AVATARS[player.character]} {player.nickname} — {player.moves} moves — {player.elapsed:.1f}s")
+
+    if show_ai and game.ai_path:
+        st.divider()
+        st.subheader("🤖 Optional AI Comparison")
+        st.metric("AI Algorithm", "A*")
+        st.metric("AI Optimal Path", f"{game.ai_path_length} moves")
         _show_maze(game.maze, path=game.ai_path)
-    matched = store.matched_ai(game_id)
-    st.success(f"Matched the AI optimal path: {len(matched)} player(s)")
-    if matched:
-        st.write("Players who matched the AI: " + ", ".join(player.nickname for player in matched))
+        matched = store.matched_ai(game_id)
+        st.success(f"Matched the AI optimal path: {len(matched)} player(s)")
+        if matched:
+            st.write("Players who matched the AI: " + ", ".join(player.nickname for player in matched))
 
 
 @st.fragment(run_every=1.0)
@@ -92,6 +146,8 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
     with maze_col:
         _show_maze(game.maze)
 
+    _live_players(store, game_id)
+
     start, reveal, end, reset = st.columns(4)
     try:
         if start.button("▶ Start Round", type="primary", disabled=game.state != "LOBBY", use_container_width=True):
@@ -105,17 +161,22 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
     except ArenaError as error:
         st.error(str(error))
 
-    if game.state in {"REVEAL", "ENDED"} and game.ai_path:
-        _leaderboard(store, game_id)
+    latest = store.get_game(game_id)
+    if latest.state == "ENDED":
+        celebration_key = f"arena_celebrated_{game_id}_{latest.ended_at}"
+        if not st.session_state.get(celebration_key):
+            st.session_state[celebration_key] = True
+            st.balloons()
+        _leaderboard(store, game_id, show_ai=bool(latest.ai_path))
+    elif latest.state == "REVEAL":
+        _leaderboard(store, game_id, show_ai=True)
     elif game.state == "PLAYING":
         st.info("The AI path and leaderboard are hidden while students are playing.")
-    elif game.state == "ENDED":
-        st.warning("Round ended without revealing the AI results.")
 
 
 def render_host_tab(maze, store: ArenaStore) -> None:
     st.subheader("🏆 Class vs AI — Live Maze Arena")
-    st.write("Create one shared round, let the class join by phone, then reveal A* after play.")
+    st.write("Create one shared round, let the class join by phone, then end the round to celebrate the winners. AI comparison is optional.")
     if "arena_host_game" not in st.session_state:
         st.session_state.arena_host_game = None
     if st.button("Create New Class Game", type="primary", disabled=st.session_state.arena_host_game is not None):
@@ -132,6 +193,7 @@ def render_host_tab(maze, store: ArenaStore) -> None:
     except ArenaError as error:
         st.error(str(error))
         return
+    st.link_button("📱 Join by entering a game code", code_join_url(base), use_container_width=True)
     host_live_panel(store, game_id, url)
     if st.button("Close Host Dashboard"):
         st.session_state.arena_host_game = None
@@ -233,4 +295,29 @@ def render_player_page(store: ArenaStore, game_id: str, token: str | None) -> No
         else:
             st.query_params["arena"] = game.game_id
             st.query_params["player"] = player.token
+            st.rerun()
+
+
+def render_code_join_page(store: ArenaStore) -> None:
+    """Mobile landing page for students who receive a game code verbally."""
+
+    st.markdown("<div class='arena-player'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='maze-hero'><h1>🏆 Class vs AI</h1><p>Enter the game code shown by your teacher</p></div>",
+        unsafe_allow_html=True,
+    )
+    with st.form("arena_code_join"):
+        game_id = st.text_input("Game Code", max_chars=12, placeholder="Example: A1B2C3")
+        submitted = st.form_submit_button("Continue", type="primary", use_container_width=True)
+    if submitted:
+        game_id = game_id.strip().upper()
+        try:
+            game = store.get_game(game_id)
+            if game.state != "LOBBY":
+                raise ArenaError("This round has already started. Late joining is closed.")
+        except ArenaError as error:
+            st.error(str(error))
+        else:
+            st.query_params.clear()
+            st.query_params["arena"] = game.game_id
             st.rerun()
