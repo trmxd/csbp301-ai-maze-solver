@@ -57,6 +57,8 @@ streamlit run app.py
 
 For local testing, set `ARENA_BASE_URL` to a URL other devices can reach, such as the computer's LAN address (`http://192.168.x.x:8501/`), not `localhost`. Start Streamlit with `streamlit run app.py --server.address 0.0.0.0`, keep all phones on the same network, open the Class vs AI tab on the host, and scan its QR code from two or more phones.
 
+For a public classroom link, the Streamlit deployment itself must allow public/anonymous access. If the app is private, scanned phones are redirected to Streamlit sign-in before they can join; change the app visibility in Streamlit Community Cloud or have every participant sign in. This is a deployment access setting, not something the QR code can bypass.
+
 SQLite is deliberately the smallest reliable architecture for this course demonstration and a single Streamlit server process. On Streamlit Community Cloud, local files are ephemeral: games disappear when the app container restarts. A scaled multi-replica deployment would need a shared external SQL database and a corresponding store adapter; no credentials or external service are required for the current single-instance demo.
 
 ## 1. Project objective
@@ -157,6 +159,7 @@ They cover Start equals Goal, a straight path, obstacles, no path, multiple rout
 - Algorithm timings on very small mazes can vary between runs because they are below one millisecond.
 - The included SQLite arena is shared across browser sessions in one Streamlit process, but it is not a multi-replica database. Streamlit Community Cloud may erase active games when the container restarts.
 - Automatic public URL discovery is not reliable in every deployment, so the host screen uses `ARENA_BASE_URL` (or its editable URL field) to construct the real session link and QR code.
+- A private Streamlit deployment requires each student to authenticate. Set the deployment to public for a scan-and-join classroom demo without sign-in.
 
 ## 14. Future improvements
 
