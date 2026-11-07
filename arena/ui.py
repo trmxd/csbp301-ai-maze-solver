@@ -174,26 +174,47 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
         st.info("The AI path and leaderboard are hidden while students are playing.")
 
 
-def render_host_tab(maze, store: ArenaStore) -> None:
+def render_host_tab(maze, store: ArenaStore, maze_editor=None) -> None:
     st.subheader("🏆 Class vs AI — Live Maze Arena")
     st.write("Create one shared round, let the class join by phone, then end the round to celebrate the winners. AI comparison is optional.")
     if "arena_host_game" not in st.session_state:
         st.session_state.arena_host_game = None
-    if st.button("Create New Class Game", type="primary", disabled=st.session_state.arena_host_game is not None):
+
+    game_id = st.session_state.arena_host_game
+    if maze_editor is not None:
+        with st.expander("✏️ Edit the Classroom Maze", expanded=not bool(game_id)):
+            if game_id:
+                st.info("This round's maze is frozen so every player receives the same maze. Close this dashboard before editing a new round.")
+            else:
+                st.caption("Edit the walls below, or use the sidebar to change the size, Start, Goal, or generate a maze.")
+                maze_editor()
+
+    default_base = os.getenv("ARENA_BASE_URL", "https://csbp301-ai-maze-solver.streamlit.app/")
+    create_column, join_column = st.columns(2)
+    if create_column.button(
+        "Create New Class Game",
+        type="primary",
+        disabled=game_id is not None,
+        use_container_width=True,
+    ):
         game = store.create_game(maze.copy())
         st.session_state.arena_host_game = game.game_id
-    game_id = st.session_state.arena_host_game
+        game_id = game.game_id
+    join_column.link_button(
+        "📱 Join by Game Code",
+        code_join_url(default_base),
+        use_container_width=True,
+    )
+
     if not game_id:
-        st.info("Create a game to generate the session ID, join link, and QR code.")
+        st.info("Edit the maze, then create a game to generate its session ID, join link, and QR code.")
         return
-    default_base = os.getenv("ARENA_BASE_URL", "https://csbp301-ai-maze-solver.streamlit.app/")
     base = st.text_input("Public app base URL", value=default_base, help="Set ARENA_BASE_URL in deployment when using another domain.")
     try:
         url = join_url(base, game_id)
     except ArenaError as error:
         st.error(str(error))
         return
-    st.link_button("📱 Join by entering a game code", code_join_url(base), use_container_width=True)
     host_live_panel(store, game_id, url)
     if st.button("Close Host Dashboard"):
         st.session_state.arena_host_game = None

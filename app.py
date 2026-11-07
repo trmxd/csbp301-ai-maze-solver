@@ -508,7 +508,14 @@ def main() -> None:
     with human:
         human_tab(maze, speed, show_scores)
     with classroom:
-        render_host_tab(maze, arena_store())
+        render_host_tab(
+            maze,
+            arena_store(),
+            maze_editor=lambda: edit_maze(
+                maze,
+                f"arena_editor_{st.session_state.editor_version}",
+            ),
+        )
 
 
 if __name__ == "__main__":

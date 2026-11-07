@@ -18,12 +18,13 @@ The **🏆 Class vs AI** tab adds a real shared classroom round without replacin
 ### Host workflow
 
 1. Open **🏆 Class vs AI** on the presentation laptop.
-2. Click **Create New Class Game**. The app freezes one copy of the currently selected maze and generates a unique game ID.
-3. Display the generated QR code and join URL. Students can also open `?join=1` and type the game code manually. The dashboard updates the Joined, Ready, Playing, and Finished counts automatically and lists every player's live status.
-4. Wait for students, then click **Start Round**. Joining closes as soon as play starts.
-5. During play, the A* route and leaderboard remain hidden. The host sees only the shared maze, player names, status, and completion counters.
-6. Click **End Round** to stop movement and reveal an animated Top 3 podium. Completed players are ranked by moves and then server-recorded elapsed time.
-7. **Reveal AI** remains available as an optional comparison. It is not required for the classroom competition. Use **Reset Round** to clear players and return the same game to an empty lobby.
+2. Open **Edit the Classroom Maze** to change walls, or use the sidebar to change size, Start, Goal, or generate a maze.
+3. Click **Create New Class Game**. The app freezes one copy of the edited maze and generates a unique game ID. Editing is locked for that round so every student receives exactly the same maze.
+4. Display the generated QR code and join URL. The **Join by Game Code** button is beside **Create New Class Game**. The dashboard updates the Joined, Ready, Playing, and Finished counts automatically and lists every player's live status.
+5. Wait for students, then click **Start Round**. Joining closes as soon as play starts.
+6. During play, the A* route and leaderboard remain hidden. The host sees only the shared maze, player names, status, and completion counters.
+7. Click **End Round** to stop movement and reveal an animated Top 3 podium. Completed players are ranked by moves and then server-recorded elapsed time.
+8. **Reveal AI** remains available as an optional comparison. It is not required for the classroom competition. Use **Reset Round** to clear players and return the same game to an empty lobby.
 
 ### Student workflow
 
