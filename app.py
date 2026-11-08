@@ -148,6 +148,14 @@ def init_state() -> None:
         if key not in st.session_state:
             st.session_state[key] = value
 
+    # Preserve active browser sessions created before terrain support was
+    # added. Streamlit may keep these objects alive during a hot deployment.
+    maze = st.session_state.maze
+    if not hasattr(maze, "terrain"):
+        maze.terrain = {}
+    if not hasattr(maze, "weighted"):
+        maze.weighted = False
+
 
 def clear_run_state() -> None:
     st.session_state.result = None
@@ -184,7 +192,7 @@ def show_maze(fig) -> None:
     plt.close(fig)
 
 
-def edit_maze(maze: Maze, key: str) -> None:
+def edit_maze(maze: Maze, key: str, *, allow_terrain: bool = False) -> None:
     st.caption("Tick cells to make walls. Start and Goal are always kept open.")
     wall_data = [
         [((row, col) in maze.walls) for col in range(maze.cols)]
@@ -204,15 +212,40 @@ def edit_maze(maze: Maze, key: str) -> None:
         maze.walls = new_walls
         maze.validate()
         clear_run_state()
-    if maze.weighted:
-        st.info("Shortest path ≠ Cheapest path · Normal 1 · Sand 3 · Mud 5")
-        data = pd.DataFrame([[maze.terrain.get((r, c), "normal") for c in range(maze.cols)]
+    if allow_terrain:
+        weighted = st.toggle(
+            "🏜️ Enable Sand and Mud terrain",
+            value=maze.weighted,
+            key=f"{key}_weighted",
+            help="Normal costs 1, Sand costs 3, and Mud costs 5.",
+        )
+        if weighted != maze.weighted:
+            maze.weighted = weighted
+            clear_run_state()
+
+    if allow_terrain and maze.weighted:
+        terrain_labels = {
+            "normal": "Normal · 1",
+            "sand": "Sand · 3",
+            "mud": "Mud · 5",
+        }
+        terrain_values = {label: kind for kind, label in terrain_labels.items()}
+        st.info("Choose the terrain for each open cell below. Walls, Start, and Goal remain valid maze cells.")
+        data = pd.DataFrame([[terrain_labels[maze.terrain.get((r, c), "normal")] for c in range(maze.cols)]
                              for r in range(maze.rows)], columns=[str(c) for c in range(maze.cols)])
         edited_terrain = st.data_editor(data, key=f"{key}_terrain", column_config={
-            str(c): st.column_config.SelectboxColumn(options=["normal", "sand", "mud"])
-            for c in range(maze.cols)})
-        terrain = {(r, c): edited_terrain.iloc[r, c] for r in range(maze.rows) for c in range(maze.cols)
-                   if maze.is_open((r, c)) and edited_terrain.iloc[r, c] != "normal"}
+            str(c): st.column_config.SelectboxColumn(
+                label=f"Column {c}",
+                options=list(terrain_values),
+                required=True,
+            ) for c in range(maze.cols)
+        }, hide_index=False, height=min(520, 38 + 35 * maze.rows))
+        terrain = {
+            (r, c): terrain_values[edited_terrain.iloc[r, c]]
+            for r in range(maze.rows)
+            for c in range(maze.cols)
+            if maze.is_open((r, c)) and terrain_values[edited_terrain.iloc[r, c]] != "normal"
+        }
         if terrain != maze.terrain:
             maze.terrain = terrain
             clear_run_state()
@@ -247,7 +280,11 @@ def run_all(maze: Maze):
 
 def solver_tab(maze: Maze, algorithm: str, speed: float, show_scores: bool) -> None:
     st.subheader("🧱 Build the maze")
-    edit_maze(maze, f"solver_editor_{st.session_state.editor_version}")
+    edit_maze(
+        maze,
+        f"solver_editor_{st.session_state.editor_version}",
+        allow_terrain=True,
+    )
     show_legend()
     fig = maze_figure(maze)
     show_maze(fig)

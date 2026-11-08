@@ -11,7 +11,7 @@ An educational Search & Path Planning project built in Python and Streamlit. It 
 
 ## Weighted Terrain / Energy-Aware Path Planning
 
-Enable **Energy / Weighted Terrain** in the sidebar. The terrain editor below the wall editor assigns Normal (1), Sand (3), or Mud (5) to open cells. Walls take precedence; Start and Goal stay open. Random generation uses 60% normal, 25% sand, and 15% mud when weighted mode is enabled. Disabling it makes all moves cost 1 while preserving assigned terrain for later use.
+Enable **Energy / Weighted Terrain** in the sidebar, or use **Enable Sand and Mud terrain** directly inside the AI Maze Solver. The terrain table below the wall editor assigns **Normal · 1**, **Sand · 3**, or **Mud · 5** to each open cell. Walls take precedence; Start and Goal stay open. Random generation uses 60% normal, 25% sand, and 15% mud when weighted mode is enabled. Disabling it makes all moves cost 1 while preserving assigned terrain for later use.
 
 Every move charges the destination cell, including entry into Goal. Start is initially free; returning to Start charges its terrain like any other move. UCS accumulates these costs. A* accumulates the same costs for g(n), with Manhattan distance × 1 for its admissible, consistent heuristic. BFS continues to minimize moves; DFS and Greedy retain their original search policies. All five report the actual energy of their resulting route separately from its move count.
 
