@@ -1,13 +1,25 @@
 """Tests for the non-blocking browser animation payload."""
 
 import unittest
+from types import SimpleNamespace
+
+import matplotlib.pyplot as plt
 
 from algorithms.astar import astar
 from core.maze import Maze
 from ui.browser_animation import _animation_data
+from ui.visualization import maze_figure
 
 
 class BrowserAnimationTests(unittest.TestCase):
+    def test_visualization_accepts_legacy_unit_cost_maze(self):
+        legacy_maze = SimpleNamespace(
+            rows=2, cols=2, start=(0, 0), goal=(1, 1), walls=set()
+        )
+        figure = maze_figure(legacy_maze)
+        self.assertIsNotNone(figure)
+        plt.close(figure)
+
     def test_payload_preserves_search_steps_and_maze(self) -> None:
         maze = Maze(3, 3, (0, 0), (2, 2), {(1, 1)})
         result = astar(maze)

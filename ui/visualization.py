@@ -33,8 +33,11 @@ def maze_figure(
     show_scores: bool = False,
 ) -> plt.Figure:
     grid = np.zeros((maze.rows, maze.cols), dtype=int)
-    if maze.weighted:
-        for cell, kind in maze.terrain.items():
+    # Streamlit Cloud can keep an older Maze instance alive across a hot
+    # reload.  Treat instances created before weighted terrain existed as
+    # ordinary unit-cost mazes instead of crashing the classroom dashboard.
+    if getattr(maze, "weighted", False):
+        for cell, kind in getattr(maze, "terrain", {}).items():
             grid[cell] = 8 if kind == "sand" else 9
     for cell in explored or []:
         grid[cell] = 1
