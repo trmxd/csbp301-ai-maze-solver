@@ -167,6 +167,8 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
         if not st.session_state.get(celebration_key):
             st.session_state[celebration_key] = True
             st.balloons()
+            st.snow()
+        st.markdown("<div class='arena-finale'>🏆 ROUND COMPLETE · OUR CHAMPIONS 🏆</div>", unsafe_allow_html=True)
         _leaderboard(store, game_id, show_ai=bool(latest.ai_path))
     elif latest.state == "REVEAL":
         _leaderboard(store, game_id, show_ai=True)

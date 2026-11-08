@@ -86,8 +86,30 @@ def apply_app_style() -> None:
             box-shadow: 0 14px 34px rgba(15,23,42,.14);
             animation: winnerEnter .65s cubic-bezier(.2,.8,.2,1) both;
         }
-        .arena-winner-2 { animation-delay: .12s; }
-        .arena-winner-3 { animation-delay: .24s; }
+        @keyframes championGlow {
+            0%, 100% { box-shadow: 0 0 18px rgba(250,204,21,.18); }
+            50% { box-shadow: 0 0 42px rgba(250,204,21,.5); }
+        }
+        @keyframes medalBounce {
+            0%, 100% { transform: translateY(0) rotate(-5deg); }
+            50% { transform: translateY(-9px) rotate(5deg); }
+        }
+        .arena-finale {
+            text-align: center; padding: 1.4rem; margin: 1rem 0;
+            font-size: clamp(1.2rem, 3vw, 2.1rem); font-weight: 850;
+            color: #facc15; letter-spacing: .08em;
+            animation: winnerEnter .8s ease both;
+        }
+        .arena-winner-1 {
+            border: 2px solid #facc15;
+            animation: winnerEnter .9s 1.4s both, championGlow 2.4s 2.3s infinite;
+        }
+        .arena-winner-2 { animation-delay: .7s; }
+        .arena-winner-3 { animation-delay: 0s; }
+        .arena-winner-1 .arena-medal { animation: medalBounce 2s 2.3s infinite; }
+        @media (prefers-reduced-motion: reduce) {
+            .arena-winner, .arena-medal, .arena-finale { animation: none !important; }
+        }
         .arena-medal { font-size: 2.25rem; }
         .arena-avatar { font-size: 2.6rem; margin: .2rem 0; }
         .arena-winner h3, .arena-winner p { margin: .25rem 0; }
