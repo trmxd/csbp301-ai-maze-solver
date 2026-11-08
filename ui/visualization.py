@@ -9,8 +9,9 @@ import numpy as np
 from core.maze import Coord, Maze
 
 
-COLORS = ["#f8fafc", "#bae6fd", "#facc15", "#1f2937", "#22c55e", "#ef4444", "#c084fc", "#fb923c"]
+COLORS = ["#f8fafc", "#bae6fd", "#facc15", "#1f2937", "#22c55e", "#ef4444", "#c084fc", "#fb923c", "#f5cf87", "#986544"]
 LABELS = {
+    "Sand · 3": "#f5cf87", "Mud · 5": "#986544",
     "Start": "#22c55e",
     "Goal": "#ef4444",
     "Wall": "#1f2937",
@@ -32,6 +33,9 @@ def maze_figure(
     show_scores: bool = False,
 ) -> plt.Figure:
     grid = np.zeros((maze.rows, maze.cols), dtype=int)
+    if maze.weighted:
+        for cell, kind in maze.terrain.items():
+            grid[cell] = 8 if kind == "sand" else 9
     for cell in explored or []:
         grid[cell] = 1
     for cell in path or []:

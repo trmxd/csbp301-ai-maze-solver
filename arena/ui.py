@@ -71,6 +71,8 @@ def _live_players(store: ArenaStore, game_id: str) -> None:
                 else "Round ended"
             ),
             "Moves": player.moves,
+            "Energy": game.maze.path_energy(player.path),
+            "AI Match": ("Yes" if game.maze.path_energy(player.path) == game.maze.path_energy(game.ai_path) else "No") if game.ai_path and player.completed else "—",
             "Time": f"{player.elapsed:.1f}s" if player.start_time is not None else "—",
         })
     st.markdown("#### 👥 Live Players")
@@ -98,7 +100,7 @@ def _leaderboard(store: ArenaStore, game_id: str, *, show_ai: bool) -> None:
                     <div class="arena-medal">{medal}</div>
                     <div class="arena-avatar">{AVATARS[player.character]}</div>
                     <h3>{escape(player.nickname)}</h3>
-                    <p>{player.moves} moves · {player.elapsed:.1f}s</p>
+                    <p>{player.moves} moves · {game.maze.path_energy(player.path)} energy · {player.elapsed:.1f}s</p>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -110,10 +112,12 @@ def _leaderboard(store: ArenaStore, game_id: str, *, show_ai: bool) -> None:
         st.divider()
         st.subheader("🤖 Optional AI Comparison")
         st.metric("AI Algorithm", "A*")
+        st.metric("AI Minimum Energy", game.maze.path_energy(game.ai_path))
+        st.metric("AI Execution Time", f"{game.ai_time * 1000:.3f} ms")
         st.metric("AI Optimal Path", f"{game.ai_path_length} moves")
         _show_maze(game.maze, path=game.ai_path)
         matched = store.matched_ai(game_id)
-        st.success(f"Matched the AI optimal path: {len(matched)} player(s)")
+        st.success(f"Matched AI minimum energy: {len(matched)} player(s)")
         if matched:
             st.write("Players who matched the AI: " + ", ".join(player.nickname for player in matched))
 
@@ -126,6 +130,7 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
         st.error(str(error))
         return
     counts = store.counts(game_id)
+    st.caption("Scoring: Energy → Moves → Time" if game.maze.weighted else "Scoring: Moves → Time")
     st.markdown(f"## 🏆 CLASS VS AI · `{game.game_id}`")
     st.markdown(f"**Round status:** `{game.state}`")
     columns = st.columns(4)
@@ -163,6 +168,12 @@ def host_live_panel(store: ArenaStore, game_id: str, url: str) -> None:
 
     latest = store.get_game(game_id)
     if latest.state == "ENDED":
+        if latest.maze.weighted and not latest.ai_path:
+            from algorithms.astar import astar
+            result = astar(latest.maze)
+            st.metric("A* minimum energy", result.path_cost)
+            st.write(f"AI moves: {result.path_length} · AI time: {result.execution_time * 1000:.3f} ms")
+            _show_maze(latest.maze, path=result.path)
         celebration_key = f"arena_celebrated_{game_id}_{latest.ended_at}"
         if not st.session_state.get(celebration_key):
             st.session_state[celebration_key] = True
@@ -233,7 +244,7 @@ def _arena_keyboard(store: ArenaStore, game, player) -> None:
         "enabled": game.state == "PLAYING" and not player.completed,
         "attempt": f"{game.game_id}:{game.started_at}",
         "acknowledged": st.session_state[seq_key],
-        "maze": {"rows": game.maze.rows, "cols": game.maze.cols, "start": list(game.maze.start), "goal": list(game.maze.goal), "walls": [list(c) for c in sorted(game.maze.walls)]},
+        "maze": {"rows": game.maze.rows, "cols": game.maze.cols, "start": list(game.maze.start), "goal": list(game.maze.goal), "terrain": [[*cell, kind] for cell, kind in game.maze.terrain.items()] if game.maze.weighted else [], "walls": [list(c) for c in sorted(game.maze.walls)]},
         "path": [list(c) for c in player.path],
     })
     if not event or event.get("id") == st.session_state[event_key]:
@@ -269,6 +280,7 @@ def player_live_panel(store: ArenaStore, game_id: str, token: str) -> None:
     player = store.get_player(game_id, token)
     metrics = st.columns(2)
     metrics[0].metric("Moves", player.moves)
+    st.metric("Energy", game.maze.path_energy(player.path))
     metrics[1].metric("Status", "Finished" if player.completed else game.state.title())
     if game.state == "PLAYING" and not player.completed:
         st.caption("Keyboard: Arrow Keys or WASD")
@@ -287,9 +299,9 @@ def player_live_panel(store: ArenaStore, game_id: str, token: str) -> None:
         if game.state == "PLAYING":
             st.info("Waiting for the host to reveal results…")
     if game.state in {"REVEAL", "ENDED"} and game.ai_path:
-        st.info(f"A* optimal path: {game.ai_path_length} moves")
-        if player.completed and player.moves == game.ai_path_length:
-            st.success("You matched the AI optimal path!")
+        st.info(f"A*: {game.ai_path_length} moves · {game.maze.path_energy(game.ai_path)} minimum energy")
+        if player.completed and game.maze.path_energy(player.path) == game.maze.path_energy(game.ai_path):
+            st.success("You matched the AI minimum energy!")
 
 
 def render_player_page(store: ArenaStore, game_id: str, token: str | None) -> None:

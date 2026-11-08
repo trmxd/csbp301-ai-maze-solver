@@ -26,7 +26,7 @@ def ucs(maze: Maze) -> SearchResult:
         if current == maze.goal:
             break
         for neighbor in neighbors(maze, current):
-            new_cost = current_cost + 1
+            new_cost = current_cost + maze.step_cost(neighbor)
             if new_cost < costs.get(neighbor, float("inf")):
                 costs[neighbor] = new_cost
                 parents[neighbor] = current

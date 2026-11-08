@@ -11,7 +11,7 @@ import streamlit as st
 from algorithms import ALGORITHMS
 from arena.store import ArenaStore
 from arena.ui import render_code_join_page, render_host_tab, render_player_page
-from core.maze import Maze, example_maze, random_maze
+from core.maze import Maze, example_maze, random_maze, weighted_demo
 from core.metrics import result_row
 from core.movement import validated_move
 from ui.browser_animation import render_browser_animation
@@ -202,7 +202,20 @@ def edit_maze(maze: Maze, key: str) -> None:
     new_walls.discard(maze.goal)
     if new_walls != maze.walls:
         maze.walls = new_walls
+        maze.validate()
         clear_run_state()
+    if maze.weighted:
+        st.info("Shortest path ≠ Cheapest path · Normal 1 · Sand 3 · Mud 5")
+        data = pd.DataFrame([[maze.terrain.get((r, c), "normal") for c in range(maze.cols)]
+                             for r in range(maze.rows)], columns=[str(c) for c in range(maze.cols)])
+        edited_terrain = st.data_editor(data, key=f"{key}_terrain", column_config={
+            str(c): st.column_config.SelectboxColumn(options=["normal", "sand", "mud"])
+            for c in range(maze.cols)})
+        terrain = {(r, c): edited_terrain.iloc[r, c] for r in range(maze.rows) for c in range(maze.cols)
+                   if maze.is_open((r, c)) and edited_terrain.iloc[r, c] != "normal"}
+        if terrain != maze.terrain:
+            maze.terrain = terrain
+            clear_run_state()
 
 
 def display_result(result) -> None:
@@ -291,7 +304,7 @@ def move_human(direction: tuple[int, int]) -> None:
                 "Method": "Human",
                 "Solved?": "Yes",
                 "Path Length": len(st.session_state.human_path) - 1,
-                "Path Cost": len(st.session_state.human_path) - 1,
+                "Path Cost": maze.path_energy(st.session_state.human_path),
                 "Expanded Nodes": None,
                 "Visited Nodes": len(set(st.session_state.human_path)),
                 "Time (ms)": round(elapsed * 1000, 3),
@@ -380,6 +393,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
                 "start": list(active_maze.start),
                 "goal": list(active_maze.goal),
                 "walls": [list(cell) for cell in sorted(active_maze.walls)],
+                "terrain": [[*cell, kind] for cell, kind in active_maze.terrain.items()] if active_maze.weighted else [],
             },
             "path": [list(cell) for cell in human_path],
         }))
@@ -395,6 +409,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             elapsed = time.perf_counter() - st.session_state.human_started
             st.write(f"Current position: **{current}** · Moves: **{len(human_path) - 1}** · Time: **{elapsed:.2f} s**")
             st.caption(f"Current path: {human_path}")
+            st.metric("Human Energy", active_maze.path_energy(human_path))
             st.caption("Keyboard: Arrow Keys or WASD")
             _, up, _ = st.columns(3)
             up.button("↑ Up", on_click=move_human, args=((-1, 0),), use_container_width=True)
@@ -442,7 +457,7 @@ def human_tab(maze: Maze, speed: float, show_scores: bool) -> None:
             elapsed = time.perf_counter() - st.session_state.human_started if st.session_state.human_started else 0
             rows.append({
                 "Method": "Human", "Solved?": "No", "Path Length": len(human_path) - 1,
-                "Path Cost": len(human_path) - 1, "Expanded Nodes": None,
+                "Path Cost": active_maze.path_energy(human_path), "Expanded Nodes": None,
                 "Visited Nodes": len(set(human_path)), "Time (ms)": round(elapsed * 1000, 3),
             })
         rows.extend(result_row(result) for result in st.session_state.sim_results)
@@ -454,9 +469,16 @@ def sidebar_controls() -> tuple[str, float, bool]:
     with st.sidebar:
         st.header("Maze controls")
         maze = st.session_state.maze
-        size = st.slider("Grid size", 5, 20, maze.rows)
+        weighted = st.toggle("Energy / Weighted Terrain", value=maze.weighted)
+        if weighted != maze.weighted:
+            maze.weighted = weighted
+            clear_run_state()
+        if st.button("Load energy tradeoff demo"):
+            replace_maze(weighted_demo())
+            st.rerun()
+        size = st.slider("Grid size", 3, 20, maze.rows)
         if size != maze.rows or size != maze.cols:
-            replace_maze(Maze(size, size))
+            replace_maze(Maze(size, size, weighted=weighted))
             st.rerun()
 
         cells = [(row, col) for row in range(maze.rows) for col in range(maze.cols)]
@@ -464,7 +486,7 @@ def sidebar_controls() -> tuple[str, float, bool]:
         selected_start = start_col.selectbox("Start cell", cells, index=cells.index(maze.start))
         selected_goal = goal_col.selectbox("Goal cell", cells, index=cells.index(maze.goal))
         if selected_start != maze.start or selected_goal != maze.goal:
-            updated = Maze(maze.rows, maze.cols, selected_start, selected_goal, set(maze.walls))
+            updated = Maze(maze.rows, maze.cols, selected_start, selected_goal, set(maze.walls), dict(maze.terrain), maze.weighted)
             replace_maze(updated)
             st.rerun()
 
@@ -476,18 +498,18 @@ def sidebar_controls() -> tuple[str, float, bool]:
         density = st.slider("Wall density", 0.05, 0.45, 0.25, 0.05)
         solvable = st.checkbox("Guarantee a solvable maze", value=True)
         if st.button("Generate random maze", use_container_width=True):
-            replace_maze(random_maze(size, size, density, solvable))
+            replace_maze(random_maze(size, size, density, solvable, weighted=weighted))
             st.rerun()
 
         if st.button("Clear all walls", use_container_width=True):
-            replace_maze(Maze(size, size, maze.start, maze.goal))
+            replace_maze(Maze(size, size, maze.start, maze.goal, terrain=dict(maze.terrain), weighted=weighted))
             st.rerun()
 
         algorithm = st.selectbox("Algorithm", list(ALGORITHMS))
         speed_label = st.select_slider("Animation speed", ["Instant", "Fast", "Normal", "Slow"], value="Fast")
         speed = {"Instant": 0.0, "Fast": 0.015, "Normal": 0.06, "Slow": 0.15}[speed_label]
         show_scores = st.checkbox("Show A* g / h / f scores")
-        st.caption("Movement is four-directional. Every move costs 1.")
+        st.caption("Four-directional movement · entering Normal costs 1, Sand 3, Mud 5" if weighted else "Four-directional movement · every move costs 1")
     return algorithm, speed, show_scores
 
 

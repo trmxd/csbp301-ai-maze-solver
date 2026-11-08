@@ -39,6 +39,7 @@ def _animation_data(maze: Maze, results: list, speed: float, show_scores: bool) 
         "start": list(maze.start),
         "goal": list(maze.goal),
         "walls": [list(cell) for cell in sorted(maze.walls)],
+        "terrain": [[*cell, kind] for cell, kind in maze.terrain.items()] if maze.weighted else [],
         "delay": delay_ms,
         "runs": runs,
     }
@@ -139,6 +140,8 @@ function buildGrid(run) {{
   for (let r=0; r<data.rows; r++) for (let c=0; c<data.cols; c++) {{
     const id = `${{r}}-${{c}}`, el = document.createElement('div');
     el.className = 'cell';
+    const terrain = data.terrain.find(([tr,tc]) => tr===r && tc===c);
+    if (terrain) el.style.boxShadow = `inset 0 0 0 5px ${{terrain[2]==='sand'?'#f5cf87':'#986544'}}`;
     if (wallSet.has(id)) el.classList.add('wall');
     if (id === key(data.start)) el.classList.add('start');
     if (id === key(data.goal)) el.classList.add('goal');

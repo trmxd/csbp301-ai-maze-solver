@@ -44,6 +44,7 @@ class Game:
     revealed_at: float | None
     ended_at: float | None
     ai_path: list[tuple[int, int]]
+    ai_time: float = 0.0
 
     @property
     def ai_path_length(self) -> int | None:
@@ -76,12 +77,13 @@ def _maze_json(maze: Maze) -> str:
     return json.dumps({
         "rows": maze.rows, "cols": maze.cols, "start": maze.start,
         "goal": maze.goal, "walls": sorted(maze.walls),
+        "terrain": [[*cell, kind] for cell, kind in maze.terrain.items()], "weighted": maze.weighted,
     }, separators=(",", ":"))
 
 
 def _maze_from_json(value: str) -> Maze:
     data = json.loads(value)
-    return Maze(data["rows"], data["cols"], tuple(data["start"]), tuple(data["goal"]), {tuple(c) for c in data["walls"]})
+    return Maze(data["rows"], data["cols"], tuple(data["start"]), tuple(data["goal"]), {tuple(c) for c in data["walls"]}, {(r,c): kind for r,c,kind in data.get("terrain", [])}, data.get("weighted", False))
 
 
 class ArenaStore:
@@ -122,6 +124,8 @@ class ArenaStore:
                     UNIQUE(game_id, nickname)
                 );
             """)
+            if "ai_time" not in {row[1] for row in db.execute("PRAGMA table_info(games)")}:
+                db.execute("ALTER TABLE games ADD COLUMN ai_time REAL NOT NULL DEFAULT 0")
 
     def create_game(self, maze: Maze, *, game_id: str | None = None, now: float | None = None) -> Game:
         game_id = (game_id or secrets.token_hex(3)).upper()
@@ -138,7 +142,7 @@ class ArenaStore:
             row = db.execute("SELECT * FROM games WHERE game_id=?", (game_id.upper(),)).fetchone()
         if row is None:
             raise ArenaError("Game not found.")
-        return Game(row["game_id"], row["state"], _maze_from_json(row["maze_json"]), row["created_at"], row["started_at"], row["revealed_at"], row["ended_at"], [tuple(c) for c in json.loads(row["ai_path_json"])])
+        return Game(row["game_id"], row["state"], _maze_from_json(row["maze_json"]), row["created_at"], row["started_at"], row["revealed_at"], row["ended_at"], [tuple(c) for c in json.loads(row["ai_path_json"])], row["ai_time"])
 
     def join_game(self, game_id: str, nickname: str, character: str, *, now: float | None = None) -> Player:
         nickname = " ".join(nickname.strip().split())
@@ -231,10 +235,13 @@ class ArenaStore:
         timestamp = time.time() if now is None else now
         with self._connect() as db:
             db.execute("UPDATE games SET state='REVEAL',revealed_at=?,ai_path_json=? WHERE game_id=?", (timestamp, json.dumps(result.path), game.game_id))
+            db.execute("UPDATE games SET ai_time=? WHERE game_id=?", (result.execution_time, game.game_id))
         return self.get_game(game_id)
 
     def end(self, game_id: str, *, now: float | None = None) -> Game:
         game = self.get_game(game_id)
+        if game.state == "PLAYING" and game.maze.weighted:
+            game = self.reveal(game_id, now=now)
         if game.state not in {"PLAYING", "REVEAL"}:
             raise ArenaError("Only a playing or revealed round can be ended.")
         with self._connect() as db:
@@ -259,10 +266,11 @@ class ArenaStore:
 
     def leaderboard(self, game_id: str) -> list[Player]:
         completed = [player for player in self.players(game_id) if player.completed]
-        return sorted(completed, key=lambda player: (player.moves, player.elapsed or float("inf"), player.nickname.lower()))
+        maze = self.get_game(game_id).maze
+        return sorted(completed, key=lambda p: (maze.path_energy(p.path) if maze.weighted else p.moves, p.moves, p.elapsed or 0))
 
     def matched_ai(self, game_id: str) -> list[Player]:
         game = self.get_game(game_id)
         if game.state not in {"REVEAL", "ENDED"} or game.ai_path_length is None:
             return []
-        return [player for player in self.leaderboard(game_id) if player.moves == game.ai_path_length]
+        return [player for player in self.leaderboard(game_id) if game.maze.path_energy(player.path) == game.maze.path_energy(game.ai_path)]

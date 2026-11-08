@@ -18,6 +18,7 @@ class SearchResult:
     visited_nodes: int
     execution_time: float
     scores: dict[Coord, tuple[float, float, float]] = field(default_factory=dict)
+    energy: int | None = None
 
     @property
     def path_length(self) -> int | None:
@@ -25,8 +26,7 @@ class SearchResult:
 
     @property
     def path_cost(self) -> int | None:
-        # Every move has unit cost in this project.
-        return self.path_length
+        return self.energy if self.solved else None
 
 
 def manhattan(a: Coord, b: Coord) -> int:
@@ -72,5 +72,6 @@ def build_result(
         visited_nodes=len(discovered),
         execution_time=perf_counter() - started_at,
         scores=scores or {},
+        energy=maze.path_energy(reconstruct_path(parents, maze.goal)) if solved else None,
     )
 

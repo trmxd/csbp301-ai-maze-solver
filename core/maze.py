@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import random
 
 Coord = tuple[int, int]
+TERRAIN_COSTS = {"normal": 1, "sand": 3, "mud": 5}
 
 
 @dataclass
@@ -17,6 +18,8 @@ class Maze:
     start: Coord = (0, 0)
     goal: Coord | None = None
     walls: set[Coord] = field(default_factory=set)
+    terrain: dict[Coord, str] = field(default_factory=dict)
+    weighted: bool = False
 
     def __post_init__(self) -> None:
         if self.goal is None:
@@ -31,6 +34,23 @@ class Maze:
         self.walls = {cell for cell in self.walls if self.in_bounds(cell)}
         self.walls.discard(self.start)
         self.walls.discard(self.goal)
+        self.terrain = {cell: kind for cell, kind in self.terrain.items()
+                        if self.is_open(cell) and kind in TERRAIN_COSTS and kind != "normal"}
+
+    def step_cost(self, cell: Coord) -> int:
+        return TERRAIN_COSTS[self.terrain.get(cell, "normal")] if self.weighted else 1
+
+    def path_energy(self, path: list[Coord]) -> int:
+        """Charge destinations only; the initial Start is free."""
+        return sum(self.step_cost(cell) for cell in path[1:])
+
+    def set_terrain(self, cell: Coord, kind: str) -> None:
+        if kind not in TERRAIN_COSTS or not self.is_open(cell):
+            raise ValueError("Terrain requires an open cell and a valid terrain type.")
+        if kind == "normal":
+            self.terrain.pop(cell, None)
+        else:
+            self.terrain[cell] = kind
 
     def in_bounds(self, cell: Coord) -> bool:
         row, col = cell
@@ -40,7 +60,7 @@ class Maze:
         return self.in_bounds(cell) and cell not in self.walls
 
     def copy(self) -> "Maze":
-        return Maze(self.rows, self.cols, self.start, self.goal, set(self.walls))
+        return Maze(self.rows, self.cols, self.start, self.goal, set(self.walls), dict(self.terrain), self.weighted)
 
 
 def random_maze(
@@ -49,6 +69,7 @@ def random_maze(
     density: float = 0.25,
     solvable: bool = True,
     seed: int | None = None,
+    weighted: bool = False,
 ) -> Maze:
     """Create a random maze; optionally preserve a guaranteed random path."""
 
@@ -76,7 +97,20 @@ def random_maze(
         for col in range(cols)
         if (row, col) not in protected and rng.random() < density
     }
-    return Maze(rows, cols, start, goal, walls)
+    maze = Maze(rows, cols, start, goal, walls, weighted=weighted)
+    if weighted:
+        for row in range(rows):
+            for col in range(cols):
+                cell = (row, col)
+                if maze.is_open(cell):
+                    maze.set_terrain(cell, rng.choices(["normal", "sand", "mud"], [60, 25, 15])[0])
+    return maze
+
+
+def weighted_demo() -> Maze:
+    """BFS: 4 moves/16 energy; UCS and A*: 6 moves/6 energy."""
+    return Maze(5, 5, (1, 0), (1, 4), set(),
+                {(1, col): "mud" for col in range(1, 4)}, True)
 
 
 def example_maze(name: str) -> Maze:

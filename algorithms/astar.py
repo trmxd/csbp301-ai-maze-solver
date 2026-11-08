@@ -33,7 +33,7 @@ def astar(maze: Maze) -> SearchResult:
             break
 
         for neighbor in neighbors(maze, current):
-            tentative_g = g_cost[current] + 1
+            tentative_g = g_cost[current] + maze.step_cost(neighbor)
             if tentative_g < g_cost.get(neighbor, float("inf")):
                 parents[neighbor] = current
                 g_cost[neighbor] = tentative_g

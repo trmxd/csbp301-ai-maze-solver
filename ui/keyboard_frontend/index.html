@@ -63,6 +63,8 @@
         const current = cellKey(preview.path[preview.path.length - 1] || preview.start);
         for (const [id, cell] of preview.cells) {
           cell.className = "cell";
+          const terrain = preview.terrain.get(id);
+          cell.style.boxShadow = terrain ? `inset 0 0 0 4px ${terrain === "sand" ? "#f5cf87" : "#986544"}` : "";
           if (preview.walls.has(id)) cell.classList.add("wall");
           if (path.has(id)) cell.classList.add("human-path");
           if (id === cellKey(preview.start)) cell.classList.add("start");
@@ -90,6 +92,7 @@
           }
         }
         preview = {
+          terrain: new Map((maze.terrain || []).map(([r,c,t]) => [`${r}-${c}`, t])),
           enabled: Boolean(state.enabled), rows: maze.rows, cols: maze.cols,
           start: maze.start, goal: maze.goal, walls: new Set(maze.walls.map(cellKey)),
           path: (state.path && state.path.length ? state.path : [maze.start]).map(cell => [...cell]),
