@@ -15,7 +15,7 @@ Enable **Energy / Weighted Terrain** in the sidebar. The terrain editor below th
 
 Every move charges the destination cell, including entry into Goal. Start is initially free; returning to Start charges its terrain like any other move. UCS accumulates these costs. A* accumulates the same costs for g(n), with Manhattan distance × 1 for its admissible, consistent heuristic. BFS continues to minimize moves; DFS and Greedy retain their original search policies. All five report the actual energy of their resulting route separately from its move count.
 
-Human energy is computed from the canonical server path. Classroom maze serialization preserves terrain and mode; player energy is derived from server-recorded paths. Weighted rounds rank by energy, moves, then elapsed time, and match A* by energy. Ending a weighted round reveals the A* benchmark automatically. Unit-cost rounds retain moves/time scoring and optional AI comparison.
+Human energy is computed from the canonical server path. Weighted terrain remains available in the Solver and Human vs AI modes. Class vs AI deliberately converts the selected grid geometry to an ordinary unit-cost maze and ranks players by moves, then elapsed time.
 
 ### Reproducible presentation example
 
@@ -31,7 +31,7 @@ Click **Compare all algorithms on this maze** to calculate the results. BFS cros
 
 ### Report-ready technical note
 
-Energy-aware planning extends the existing grid with a sparse cell-to-terrain mapping and an explicit weighted-mode flag. Destination costs are shared by all result calculations. Only UCS and A* priority calculations change; maze connectivity and other search policies remain intact. Tests verify terrain costs, free initial Start, real weighted path costs, BFS/UCS/A* tradeoffs, Manhattan admissibility at every demo cell, terrain editing/copying/generation, shared classroom persistence, weighted ranking, and AI matching. The six new tests and 48 existing tests passed (54 total). Browser rendering and physical phone behavior require device validation; automated tests do not establish network responsiveness under classroom load. No paid API or extra dependency is required. Existing SQLite deployment limitations still apply.
+Energy-aware planning extends the existing grid with a sparse cell-to-terrain mapping and an explicit weighted-mode flag. Destination costs are shared by all result calculations. Only UCS and A* priority calculations change; maze connectivity and other search policies remain intact. Tests verify terrain costs, free initial Start, real weighted path costs, BFS/UCS/A* tradeoffs, Manhattan admissibility at every demo cell, terrain editing/copying/generation, unit-cost classroom conversion, shared classroom persistence, move-based ranking, and AI matching. The current automated suite passes 55 tests. Browser rendering and physical phone behavior require device validation; automated tests do not establish network responsiveness under classroom load. No paid API or extra dependency is required. Existing SQLite deployment limitations still apply.
 
 Open the project in your browser: **[CSBP301 AI Maze Solver](https://csbp301-ai-maze-solver.streamlit.app/)**
 
@@ -58,7 +58,7 @@ The **🏆 Class vs AI** tab adds a real shared classroom round without replacin
 4. After the host starts, solve the same maze using the large phone-friendly touch arrows. Arrow Keys and WASD also work on devices with keyboards.
 5. The server validates every request. Walls and boundaries do not move the player or increase the move count. Repeated finish requests do not alter a completed result.
 
-The leaderboard contains completed players only. It sorts by the lowest valid move count and then the lowest server-recorded elapsed time. Unfinished players remain stored as unfinished and are never given a fabricated result. With unit-cost four-directional movement and the existing admissible Manhattan heuristic, A* is used as the shortest-path benchmark for this mode; the other algorithms remain available in the original solver.
+The Class vs AI arena always freezes an ordinary unit-cost maze, even if weighted terrain is enabled in another app mode. Terrain and energy scoring are intentionally excluded from classroom rounds. The leaderboard contains completed players only. It sorts by the lowest valid move count and then the lowest server-recorded elapsed time. Unfinished players remain stored as unfinished and are never given a fabricated result. With unit-cost four-directional movement and the existing admissible Manhattan heuristic, A* is used as the shortest-path benchmark for this mode; the other algorithms remain available in the original solver.
 
 ### Multiplayer architecture
 

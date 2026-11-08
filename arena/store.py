@@ -77,13 +77,23 @@ def _maze_json(maze: Maze) -> str:
     return json.dumps({
         "rows": maze.rows, "cols": maze.cols, "start": maze.start,
         "goal": maze.goal, "walls": sorted(maze.walls),
-        "terrain": [[*cell, kind] for cell, kind in maze.terrain.items()], "weighted": maze.weighted,
     }, separators=(",", ":"))
 
 
 def _maze_from_json(value: str) -> Maze:
     data = json.loads(value)
-    return Maze(data["rows"], data["cols"], tuple(data["start"]), tuple(data["goal"]), {tuple(c) for c in data["walls"]}, {(r,c): kind for r,c,kind in data.get("terrain", [])}, data.get("weighted", False))
+    # Classroom rounds are intentionally unit-cost.  Ignore legacy terrain
+    # fields so old database rows also load as ordinary mazes.
+    return Maze(
+        data["rows"], data["cols"], tuple(data["start"]),
+        tuple(data["goal"]), {tuple(c) for c in data["walls"]},
+    )
+
+
+def _unit_cost_copy(maze: Maze) -> Maze:
+    """Freeze only the grid geometry required by a classroom round."""
+
+    return Maze(maze.rows, maze.cols, maze.start, maze.goal, set(maze.walls))
 
 
 class ArenaStore:
@@ -133,7 +143,7 @@ class ArenaStore:
         with self._connect() as db:
             db.execute(
                 "INSERT INTO games(game_id,state,maze_json,created_at) VALUES(?,?,?,?)",
-                (game_id, "LOBBY", _maze_json(maze.copy()), timestamp),
+                (game_id, "LOBBY", _maze_json(_unit_cost_copy(maze)), timestamp),
             )
         return self.get_game(game_id)
 
@@ -240,8 +250,6 @@ class ArenaStore:
 
     def end(self, game_id: str, *, now: float | None = None) -> Game:
         game = self.get_game(game_id)
-        if game.state == "PLAYING" and game.maze.weighted:
-            game = self.reveal(game_id, now=now)
         if game.state not in {"PLAYING", "REVEAL"}:
             raise ArenaError("Only a playing or revealed round can be ended.")
         with self._connect() as db:
@@ -266,11 +274,10 @@ class ArenaStore:
 
     def leaderboard(self, game_id: str) -> list[Player]:
         completed = [player for player in self.players(game_id) if player.completed]
-        maze = self.get_game(game_id).maze
-        return sorted(completed, key=lambda p: (maze.path_energy(p.path) if maze.weighted else p.moves, p.moves, p.elapsed or 0))
+        return sorted(completed, key=lambda player: (player.moves, player.elapsed or 0))
 
     def matched_ai(self, game_id: str) -> list[Player]:
         game = self.get_game(game_id)
         if game.state not in {"REVEAL", "ENDED"} or game.ai_path_length is None:
             return []
-        return [player for player in self.leaderboard(game_id) if game.maze.path_energy(player.path) == game.maze.path_energy(game.ai_path)]
+        return [player for player in self.leaderboard(game_id) if player.moves == game.ai_path_length]

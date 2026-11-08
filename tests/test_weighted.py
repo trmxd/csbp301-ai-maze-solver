@@ -57,7 +57,7 @@ class WeightedTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             maze.set_terrain((0, 1), 'mud')
 
-    def test_shared_weighted_round_ranks_energy_and_matches_ai(self):
+    def test_arena_converts_weighted_maze_to_unit_cost(self):
         with tempfile.TemporaryDirectory() as directory:
             store = ArenaStore(Path(directory) / 'arena.db')
             game = store.create_game(weighted_demo())
@@ -69,6 +69,8 @@ class WeightedTests(unittest.TestCase):
             for d in ['up'] + ['right'] * 4 + ['down']:
                 store.move_player(game.game_id, cheap.token, d, now=15)
             store.reveal(game.game_id)
-            self.assertEqual([p.nickname for p in store.leaderboard(game.game_id)], ['Cheap', 'Short'])
-            self.assertEqual([p.nickname for p in store.matched_ai(game.game_id)], ['Cheap'])
-            self.assertEqual(store.get_game(game.game_id).maze.terrain, weighted_demo().terrain)
+            self.assertEqual([p.nickname for p in store.leaderboard(game.game_id)], ['Short', 'Cheap'])
+            self.assertEqual([p.nickname for p in store.matched_ai(game.game_id)], ['Short'])
+            arena_maze = store.get_game(game.game_id).maze
+            self.assertFalse(arena_maze.weighted)
+            self.assertEqual(arena_maze.terrain, {})

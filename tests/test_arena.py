@@ -30,6 +30,13 @@ class ArenaStoreTests(unittest.TestCase):
         self.assertEqual(stored.state, "LOBBY")
         self.assertEqual(stored.maze.walls, {(1, 1)})
 
+    def test_create_game_always_uses_unit_cost_maze(self):
+        weighted = Maze(3, 3, terrain={(0, 1): "mud"}, weighted=True)
+        game = self.store.create_game(weighted, game_id="UNIT01", now=10)
+        self.assertFalse(game.maze.weighted)
+        self.assertEqual(game.maze.terrain, {})
+        self.assertEqual(game.maze.step_cost((0, 1)), 1)
+
     def test_join_game_records_identity_and_start_position(self):
         player = self.join(character="Robot")
         self.assertEqual((player.nickname, player.character), ("Ada", "Robot"))
